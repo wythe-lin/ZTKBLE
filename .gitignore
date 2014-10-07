@@ -48,7 +48,8 @@ modules.builtin
 *.sim
 *.map
 *.browse
-
+*.prj
+*.pui
 
 #
 # Top-level generic files
