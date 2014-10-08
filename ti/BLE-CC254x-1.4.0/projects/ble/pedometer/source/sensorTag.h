@@ -57,15 +57,15 @@ extern "C"
  */
 
 // Sensor Tag Task Events
-#define ST_START_DEVICE_EVT			0x0001
-#define ST_SYSRST_EVT				0x0002
-#define ST_MODE_EVT				0x0004
-#define ST_SLEEP_EVT				0x0008
+#define EVT_START_DEVICE			0x0001
+#define EVT_SYSRST				0x0002
+#define EVT_MODE				0x0004
+#define EVT_SLEEP				0x0008
 
-#define ST_GSENSOR_EVT				0x0100
-#define ST_DISP_EVT				0x0200
-#define ST_BLE_EVT				0x0400
-#define ST_SCREEN_EVT				0x0800
+#define EVT_GSENSOR				0x0100
+#define EVT_DISP				0x0200
+#define EVT_PWMGR				0x0400
+#define EVT_SCREEN_SAVING			0x0800
 
 
 #define MODE_NORMAL				0x00
@@ -91,6 +91,13 @@ struct sport_info {
 	unsigned short	calorie;	// weight x distance x 1.036
 	UTCTime		time;
 };
+
+typedef enum {
+	PWMGR_S0 = 0,		// full run
+	PWMGR_S1,		// oled screen saving
+	PWMGR_S2,		// g-sensor active only
+	PWMGR_S3,		// CPU halt
+} pwmgr_t;
 
 
 /*********************************************************************

@@ -116,7 +116,7 @@ char adxl345_init(void)
 
 char adxl345_read(unsigned short *p)
 {
-	unsigned char	intsrc;
+	unsigned char	intsrc, i;
 	unsigned char	x0, x1;
 	unsigned char	y0, y1;
 	unsigned char	z0, z1;
@@ -132,33 +132,50 @@ char adxl345_read(unsigned short *p)
 	}
 
 	// read the three registers
-	if (adxl345_reg_read(XL345_DATAX0, &x0)) {
-		if (adxl345_reg_read(XL345_DATAX1, &x1)) {
-			if (adxl345_reg_read(XL345_DATAY0, &y0)) {
-				if (adxl345_reg_read(XL345_DATAY1, &y1)) {
-					if (adxl345_reg_read(XL345_DATAZ0, &z0)) {
-						if (adxl345_reg_read(XL345_DATAZ1, &z1)) {
-							// valid data
-							ret  = 1;
+	if (!adxl345_reg_read(XL345_DATAX0, &x0)) {
+		return ret;
+	}
+	if (!adxl345_reg_read(XL345_DATAX1, &x1)) {
+		return ret;
+	}
 
-							p[0] = ((unsigned short) x1) << 8 | x0;
-							p[1] = ((unsigned short) y1) << 8 | y0;
-							p[2] = ((unsigned short) z1) << 8 | z0;
+	if (!adxl345_reg_read(XL345_DATAY0, &y0)) {
+		return ret;
+	}
+	if (!adxl345_reg_read(XL345_DATAY1, &y1)) {
+		return ret;
+	}
 
-							dmsg(("X=%04x, Y=%04x, Z=%04x\n", p[0], p[1], p[2]));
-						}
-					}
-				}
-			}
+	if (!adxl345_reg_read(XL345_DATAZ0, &z0)) {
+		return ret;
+	}
+	if (!adxl345_reg_read(XL345_DATAZ1, &z1)) {
+		return ret;
+	}
+
+	// valid data
+	ret  = 1;
+
+	p[0] = ((unsigned short) x1) << 8 | x0;
+	p[1] = ((unsigned short) y1) << 8 | y0;
+	p[2] = ((unsigned short) z1) << 8 | z0;
+
+	dmsg(("X=%04x, Y=%04x, Z=%04x\n", p[0], p[1], p[2]));
+
+	// translate the two's complement to true binary code
+	for (i=0; i<3; i++) {
+		if (p[i] > 32768) {
+			p[i] = (p[i] ^ 0xFFFF) + 1;
 		}
 	}
+
 	return ret;
 }
 
 
 void adxl345_enter_sleep(void)
 {
-	adxl345_reg_write(XL345_POWER_CTL, XL345_STANDBY);
+//	adxl345_reg_write(XL345_POWER_CTL, XL345_STANDBY);
 }
 
 

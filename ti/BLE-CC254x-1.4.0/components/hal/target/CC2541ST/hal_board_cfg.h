@@ -105,7 +105,7 @@
  * ------------------------------------------------------------------------------------------------
  */
 
-#define HAL_NUM_LEDS            2
+#define HAL_NUM_LEDS            3
 
 #define HAL_LED_BLINK_DELAY()   st( { volatile uint32 i; for (i=0; i<0x5800; i++) { }; } )
 

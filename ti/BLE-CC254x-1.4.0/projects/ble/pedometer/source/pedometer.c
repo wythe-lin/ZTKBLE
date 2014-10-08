@@ -32,16 +32,16 @@
  *
  *****************************************************************************
  */
-#define DBG_MSG			1
+#define DBG_MSG			0
+#define DBG_TWIN		1
+
 #if (DBG_MSG == 1)
     #include <stdio.h>
     #define dmsg(x)		printf x
 #else
     #define dmsg(x)
 #endif
-
-#define DBG_TWIN		1
-#if (DBG_MSG == 1)
+#if (DBG_TWIN == 1)
     #include <stdio.h>
     #define twmsg(x)		printf x
 #else

@@ -50,6 +50,7 @@
 #include "OSAL_Clock.h"
 
 #include "OnBoard.h"
+#include "hal_drivers.h"
 #include "hal_adc.h"
 #include "hal_led.h"
 #include "hal_keys.h"
@@ -109,13 +110,6 @@
  *
  *****************************************************************************
  */
-// How often to perform sensor reads (milliseconds)
-#define ACC_DEFAULT_PERIOD			20
-
-// Constants for two-stage reading
-#define TEMP_MEAS_DELAY				275	// Conversion time 250 ms
-#define ACC_FSM_PERIOD				20
-
 // What is the advertising interval when device is discoverable (units of 625us, 160=100ms)
 #define DEFAULT_ADVERTISING_INTERVAL		160
 
@@ -123,13 +117,16 @@
 #define DEFAULT_DISCOVERABLE_MODE		GAP_ADTYPE_FLAGS_LIMITED
 
 // Minimum connection interval (units of 1.25ms, 80=100ms) if automatic parameter update request is enabled
+// iOS request minimum interval > 20ms
 #define DEFAULT_DESIRED_MIN_CONN_INTERVAL	80
 
 // Maximum connection interval (units of 1.25ms, 800=1000ms) if automatic parameter update request is enabled
+// iOS request maximum interval < 2s
 #define DEFAULT_DESIRED_MAX_CONN_INTERVAL	800
 
 // Slave latency to use if automatic parameter update request is enabled
-#define DEFAULT_DESIRED_SLAVE_LATENCY		1
+// iOS request slave latency < 4s
+#define DEFAULT_DESIRED_SLAVE_LATENCY		0
 
 // Supervision timeout value (units of 10ms, 1000=10s) if automatic parameter update request is enabled
 // Supervision Timeout > (1 + Slave Latency) * (Connection Interval)
@@ -148,13 +145,22 @@
 #define B_ADDR_STR_LEN				15
 
 // battery level
-#define BATT_LEVEL_00				500	// 464	// 4.0V 1858
-#define BATT_LEVEL_01				455	// 3.4V 1857
-#define BATT_LEVEL_02				443	// 3.2V 1737
-#define BATT_LEVEL_03				428	// 3.1V
-#define BATT_LEVEL_04				414	// 3.0V
-#define BATT_LEVEL_05				394	// 2.9V
-#define BATT_LEVEL_06				382	// 2.8V
+#define BATT_LEVEL_00				500		// 464	// 4.0V 1858
+#define BATT_LEVEL_01				455		// 3.4V 1857
+#define BATT_LEVEL_02				443		// 3.2V 1737
+#define BATT_LEVEL_03				428		// 3.1V
+#define BATT_LEVEL_04				414		// 3.0V
+#define BATT_LEVEL_05				394		// 2.9V
+#define BATT_LEVEL_06				382		// 2.8V
+
+// how often to perform something (milliseconds)
+#define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
+#define PERIOD_MODE_SLEEP			(1000*4)	// into sleep mode
+#define PERIOD_SYSRST				(1000*8)	// system reset
+#define PERIOD_GSENSOR				(20)		// g-sensor
+#define PERIOD_DISP				(200)		// oled display
+#define PERIOD_SCREEN_SAVING			(1000*5)	// screen saving
+#define PERIOD_PWMGR				(1000*10)	// power saving
 
 
 /*
@@ -250,21 +256,18 @@ static uint8		attDeviceName[] = "Zealtek Pedometer B";
 static uint8		attDeviceName[] = "Zealtek Pedometer";
 #endif
 
-
 // sensor state variables
 static bool		key1_press	   = FALSE;
-static bool		screen_saving	   = TRUE;
 
-static unsigned short	gsen_period	   = ACC_DEFAULT_PERIOD;
+static unsigned short	gsen_period	   = PERIOD_GSENSOR;
 
-static unsigned char	current_adv_status = FALSE;
 static unsigned char	opmode		   = MODE_NORMAL;
 static unsigned short	acc[3]		   = { 0, 0, 0 };
 
 static unsigned char	charge_icon	   = 0;
 static unsigned char	charge_cnt	   = 0;
 
-static UTCTime		time_workout	   = 0;
+static pwmgr_t		power_saving	   = PWMGR_S2;
 
 static struct personal_info 	pi = {
 	170,					// unit: cm
@@ -294,187 +297,6 @@ static struct sport_info	workout = {
  *
  ***************************************************************************** 
  */
-/**
- * @fn      sensorTag_HandleKeys
- *
- * @brief   Handles all key events for this device.
- *
- * @param   shift - true if in shift/alt.
- * @param   keys - bit field for key events. Valid entries:
- *                 HAL_KEY_SW_2
- *                 HAL_KEY_SW_1
- *
- * @return  none
- */
-static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
-{
-	VOID	shift;		// Intentionally unreferenced parameter
-	uint8	SK_Keys = 0;
-
-	if (keys & HAL_KEY_SW_1) {
-		// find the current GAP advertising status
-		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
-		if (current_adv_status == FALSE) {
-			current_adv_status = TRUE;
-			GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
-		}
-		osal_start_timerEx(sensorTag_TaskID, ST_BLE_EVT, 10000);
-
-		// press KEY1
-		key1_press = TRUE;
-		osal_start_timerEx(sensorTag_TaskID, ST_MODE_EVT,   2000);
-		osal_start_timerEx(sensorTag_TaskID, ST_SLEEP_EVT,  4000);
-		osal_start_timerEx(sensorTag_TaskID, ST_SYSRST_EVT, 8000);
-
-		if (!screen_saving) {
-			switch (opmode & 0xF0) {
-			case MODE_NORMAL:
-				opmode++;
-#if defined(HAL_IMAGE_B)
-				if (opmode > (MODE_NORMAL + MODE_DISTANCE)) {
-#else
-				if (opmode > (MODE_NORMAL + MODE_DBG)) {
-#endif
-					opmode = MODE_NORMAL | MODE_TIME;
-				}
-				break;
-
-			case MODE_WORKOUT:
-				opmode++;
-#if defined(HAL_IMAGE_B)
-				if (opmode > (MODE_WORKOUT + MODE_DISTANCE)) {
-#else
-				if (opmode > (MODE_WORKOUT + MODE_DBG)) {
-#endif
-					opmode = MODE_WORKOUT | MODE_TIME;
-				}
-				break;
-
-			case MODE_SLEEP:
-			default:
-				break;
-			}
-		}
-		screen_saving = FALSE;
-		osal_start_timerEx(sensorTag_TaskID, ST_SCREEN_EVT, 11000);	// about 10.0s
-
-		vgm064032a1w01_exit_sleep();
-		vgm064032a1w01_clr_screen();
-		osal_set_event(sensorTag_TaskID, ST_DISP_EVT);
-
-	} else {
-		// release KEY1
-		key1_press = FALSE;
-
-	}
-
-
-	if (keys & HAL_KEY_SW_2) {		// Carbon S2
-		SK_Keys |= SK_KEY_LEFT;
-	}
-
-	if (keys & HAL_KEY_SW_3) {		// Carbon S3
-		SK_Keys |= SK_KEY_RIGHT;
-	}
-
-}
-
-
-/**
- * @fn      sensorTag_ProcessOSALMsg
- *
- * @brief   Process an incoming task message.
- *
- * @param   pMsg - message to process
- *
- * @return  none
- */
-static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *pMsg)
-{
-	switch (pMsg->event) {
-	case KEY_CHANGE:
-		sensorTag_HandleKeys(((keyChange_t *)pMsg)->state, ((keyChange_t *)pMsg)->keys);
-		break;
-
-	default:
-		// do nothing
-		break;
-	}
-}
-
-
-/**
- * @fn      resetSensorSetup
- *
- * @brief   Turn off all sensors that are on
- *
- * @param   none
- *
- * @return  none
- */
-static void resetSensorSetup(void)
-{
-
-
-}
-
-
-/**
- * @fn      peripheralStateNotificationCB
- *
- * @brief   Notification from the profile of a state change.
- *
- * @param   newState - new state
- *
- * @return  none
- */
-static void peripheralStateNotificationCB(gaprole_States_t newState)
-{
-	switch (newState) {
-	case GAPROLE_STARTED:
-		{
-			uint8	ownAddress[B_ADDR_LEN];
-			uint8	systemId[DEVINFO_SYSTEM_ID_LEN];
-
-			GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
-
-			// use 6 bytes of device address for 8 bytes of system ID value
-			systemId[0] = ownAddress[0];
-			systemId[1] = ownAddress[1];
-			systemId[2] = ownAddress[2];
-
-			// set middle bytes to zero
-			systemId[4] = 0x00;
-			systemId[3] = 0x00;
-
-			// shift three bytes up
-			systemId[7] = ownAddress[5];
-			systemId[6] = ownAddress[4];
-			systemId[5] = ownAddress[3];
-
-			DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
-		}
-		break;
-
-	case GAPROLE_ADVERTISING:
-		HalLedSet(HAL_LED_1, HAL_LED_MODE_OFF);
-		break;
-
-	case GAPROLE_CONNECTED:
-		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
-		break;
-
-	case GAPROLE_WAITING:
-		// Link terminated intentionally: reset all sensors
-		resetSensorSetup();
-		break;
-
-	default:
-		break;
-	}
-	gapProfileState = newState;
-}
-
 /**
  * @fn      sensorTag_ClockSet
  *
@@ -514,6 +336,7 @@ static void sensorTag_ClockGet(UTCTimeStruct *t)
 {
 	osal_ConvertUTCTime(t, osal_getClock());
 }
+
 
 /**
  * @fn      sensorTag_BattMeasure
@@ -586,6 +409,124 @@ static void sensorTag_BattDisp(unsigned char level)
 	}
 }
 
+
+/**
+ * @fn      sensorTag_HandleKeys
+ *
+ * @brief   Handles all key events for this device.
+ *
+ * @param   shift - true if in shift/alt.
+ * @param   keys - bit field for key events. Valid entries:
+ *                 HAL_KEY_SW_2
+ *                 HAL_KEY_SW_1
+ *
+ * @return  none
+ */
+static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
+{
+	VOID	shift;		// Intentionally unreferenced parameter
+	uint8	SK_Keys = 0;
+	uint8	current_adv_status;
+
+	if (keys & HAL_KEY_SW_1) {
+		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
+		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
+
+		// find the current GAP advertising status
+		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
+		if (current_adv_status == FALSE) {
+			current_adv_status = TRUE;
+			GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
+		}
+
+		// display
+		vgm064032a1w01_exit_sleep();
+		vgm064032a1w01_clr_screen();
+		osal_set_event(sensorTag_TaskID, EVT_DISP);
+
+		// power management
+		osal_start_timerEx(sensorTag_TaskID, EVT_SCREEN_SAVING, PERIOD_SCREEN_SAVING);
+		osal_start_timerEx(sensorTag_TaskID, EVT_PWMGR,		PERIOD_PWMGR);
+
+		// press KEY1
+		key1_press = TRUE;
+		osal_start_timerEx(sensorTag_TaskID, EVT_MODE,   PERIOD_MODE_SWITCH);
+		osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
+		osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
+
+		if (power_saving == PWMGR_S0) {
+			switch (opmode & 0xF0) {
+			case MODE_NORMAL:
+				opmode++;
+#if defined(HAL_IMAGE_B)
+				if (opmode > (MODE_NORMAL + MODE_DISTANCE)) {
+#else
+				if (opmode > (MODE_NORMAL + MODE_DBG)) {
+#endif
+					opmode = MODE_NORMAL | MODE_TIME;
+				}
+				break;
+
+			case MODE_WORKOUT:
+				opmode++;
+#if defined(HAL_IMAGE_B)
+				if (opmode > (MODE_WORKOUT + MODE_DISTANCE)) {
+#else
+				if (opmode > (MODE_WORKOUT + MODE_DBG)) {
+#endif
+					opmode = MODE_WORKOUT | MODE_TIME;
+				}
+				break;
+
+			case MODE_SLEEP:
+			default:
+				break;
+			}
+		}
+
+		power_saving = PWMGR_S0;
+
+	} else {
+		// release KEY1
+		key1_press = FALSE;
+
+	}
+
+
+	if (keys & HAL_KEY_SW_2) {
+		SK_Keys |= SK_KEY_LEFT;
+	}
+
+	if (keys & HAL_KEY_SW_3) {
+		SK_Keys |= SK_KEY_RIGHT;
+	}
+
+}
+
+
+/**
+ * @fn      sensorTag_ProcessOSALMsg
+ *
+ * @brief   Process an incoming task message.
+ *
+ * @param   pMsg - message to process
+ *
+ * @return  none
+ */
+static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *pMsg)
+{
+	switch (pMsg->event) {
+	case KEY_CHANGE:
+		sensorTag_HandleKeys(((keyChange_t *) pMsg)->state, ((keyChange_t *) pMsg)->keys);
+		break;
+
+	default:
+		// do nothing
+		break;
+	}
+}
+
+
 /**
  * @fn      sensorTag_HandleDisp
  *
@@ -599,11 +540,6 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 {
 	VOID		*p;
 	UTCTimeStruct	time;
-
-	normal.distance  =  (steps_normal * pi.stride) / 100UL;
-	workout.distance = ((steps_normal - steps_workout) * pi.stride) / 100UL;
-	normal.calorie   = (unsigned short) ((float) (normal.distance  / 1000UL * pi.weight) * 1.036);
-	workout.calorie  = (unsigned short) ((float) (workout.distance / 1000UL * pi.weight) * 1.036);
 
 	if ((mode & 0xF0) == MODE_SLEEP) {
 		// display time
@@ -644,7 +580,7 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 
 		} else {
 			// display chronograph
-			osal_ConvertUTCTime(&time, osal_getClock() - time_workout);
+			osal_ConvertUTCTime(&time, osal_getClock() - workout.time);
 
 			vgm064032a1w01_set_font(&num8x16);
 			vgm064032a1w01_draw_icon(0,  0, time.hour/10);
@@ -741,16 +677,77 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 }
 
 
+/**
+ * @fn      peripheral_state_notification
+ *
+ * @brief   Notification from the profile of a state change.
+ *
+ * @param   newState - new state
+ *
+ * @return  none
+ */
+static void peripheral_state_notification(gaprole_States_t newState)
+{
+	switch (newState) {
+	case GAPROLE_STARTED:
+		{
+			uint8	ownAddress[B_ADDR_LEN];
+			uint8	systemId[DEVINFO_SYSTEM_ID_LEN];
+
+			GAPRole_GetParameter(GAPROLE_BD_ADDR, ownAddress);
+
+			// use 6 bytes of device address for 8 bytes of system ID value
+			systemId[0] = ownAddress[0];
+			systemId[1] = ownAddress[1];
+			systemId[2] = ownAddress[2];
+
+			// set middle bytes to zero
+			systemId[4] = 0x00;
+			systemId[3] = 0x00;
+
+			// shift three bytes up
+			systemId[7] = ownAddress[5];
+			systemId[6] = ownAddress[4];
+			systemId[5] = ownAddress[3];
+
+			DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
+		}
+		break;
+
+	case GAPROLE_ADVERTISING:
+//		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
+		break;
+
+	case GAPROLE_CONNECTED:
+//		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
+		break;
+
+	case GAPROLE_WAITING:
+		// Link terminated intentionally: reset all sensors
+
+		break;
+
+	default:
+	case GAPROLE_INIT:
+	case GAPROLE_WAITING_AFTER_TIMEOUT:
+	case GAPROLE_CONNECTED_ADV:
+	case GAPROLE_ERROR:
+		break;
+	}
+	gapProfileState = newState;
+}
+
+
 /*
  *****************************************************************************
  *
- * profile callbacks
+ * profile functions
  *
  *****************************************************************************
  */
 // GAP Role Callbacks
 static gapRolesCBs_t	sensorTag_PeripheralCBs = {
-	peripheralStateNotificationCB,	// Profile State Change Callbacks
+	peripheral_state_notification,	// Profile State Change Callbacks
 	NULL				// When a valid RSSI is read from controller (not used by application)
 };
 
@@ -761,13 +758,6 @@ static gapBondCBs_t	sensorTag_BondMgrCBs = {
 };
 
 
-/*
- *****************************************************************************
- *
- * public functions
- *
- *****************************************************************************
- */
 /**
  * @fn      SensorTag_Init
  *
@@ -792,7 +782,7 @@ void SensorTag_Init(uint8 task_id)
 	// Setup the GAP Peripheral Role Profile
 	{
 		// Device starts advertising upon initialization
-		current_adv_status = FALSE;
+		uint8	current_adv_status = FALSE;
 
 		// By setting this to zero, the device will go into the waiting state after
 		// being discoverable for 30.72 second, and will not being advertising again
@@ -879,7 +869,7 @@ void SensorTag_Init(uint8 task_id)
 	HCI_EXT_ClkDivOnHaltCmd(HCI_EXT_ENABLE_CLK_DIVIDE_ON_HALT);
 
 	// Setup a delayed profile startup
-	osal_set_event(sensorTag_TaskID, ST_START_DEVICE_EVT);
+	osal_set_event(sensorTag_TaskID, EVT_START_DEVICE);
 }
 
 
@@ -899,13 +889,15 @@ void SensorTag_Init(uint8 task_id)
 uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 {
 	VOID	task_id;	// OSAL required parameter that isn't used in this function
+	uint8	current_adv_status;
 
-
+	/////////////////////////
+	// handle system event //
+	/////////////////////////
 	if (events & SYS_EVENT_MSG) {
 		uint8	*pMsg;
 
 		if ((pMsg = osal_msg_receive(sensorTag_TaskID)) != NULL) {
-			dmsg(("SYS_EVENT_MSG\n"));
 			sensorTag_ProcessOSALMsg((osal_event_hdr_t *) pMsg);
 
 			// release the OSAL message
@@ -916,126 +908,178 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		return (events ^ SYS_EVENT_MSG);
 	}
 
-	if (events & ST_START_DEVICE_EVT) {
-		dmsg(("ST_START_DEVICE_EVT\n"));
+	////////////////////////
+	// start device event //
+	////////////////////////
+	if (events & EVT_START_DEVICE) {
+		dmsg(("start device...\n"));
 
-		// Start the Device
+		// start the device
 		GAPRole_StartDevice(&sensorTag_PeripheralCBs);
 
-		// Start Bond Manager
+		// start bond manager
 		GAPBondMgr_Register(&sensorTag_BondMgrCBs);
 
 		vgm064032a1w01_init();
-		vgm064032a1w01_clr_screen();
-
 		adxl345_init();
 
-		osal_set_event(sensorTag_TaskID, ST_GSENSOR_EVT);
-		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_BATTERY);
+		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
+		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
+		osal_set_event(sensorTag_TaskID, EVT_PWMGR);
 
-		return (events ^ ST_START_DEVICE_EVT);
+		return (events ^ EVT_START_DEVICE);
 	}
 
 
-	//////////////////////////////////////
-	// handle system reset (long press) //
-	//////////////////////////////////////
-	if (events & ST_SYSRST_EVT) {
-		if (key1_press) {
-			dmsg(("ST_SYSRST_EVT\n"));
-			HAL_SYSTEM_RESET();
-		}
-		return (events ^ ST_SYSRST_EVT);
-	}
+	/////////////////////////////
+	// handle power management //
+	/////////////////////////////
+	if (events & EVT_PWMGR) {
+		dmsg(("power saving...\n"));
 
-
-	////////////////
-	// handle BLE //
-	////////////////
-	if (events & ST_BLE_EVT) {
-		if (gapProfileState == GAPROLE_CONNECTED) {
-			// disconnect
-//			GAPRole_TerminateConnection();
-		}
-//		current_adv_status = FALSE;
-//		GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
-		return (events ^ ST_BLE_EVT);
-	}
-
-
-	///////////////////
-	// Accelerometer //
-	///////////////////
-	if (events & ST_GSENSOR_EVT) {
-//		dmsg(("ST_GSENSOR_EVT\n"));
-
-		if (adxl345_read(acc)) {
-			char	i;
-
-			// translate the two's complement to true binary code
-			for (i=0; i<3; i++) {
-				if (acc[i] > 32768) {
-					acc[i] = (acc[i] ^ 0xFFFF) + 1;
-				}
+		// GAP
+		if (gapProfileState == GAPROLE_ADVERTISING) {
+			GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
+			if (current_adv_status == TRUE) {
+				current_adv_status = FALSE;
+				GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
 			}
-			pedometer(acc);
-
-			osal_start_timerEx(sensorTag_TaskID, ST_GSENSOR_EVT, gsen_period);
 		}
-		return (events ^ ST_GSENSOR_EVT);
+
+		//
+		if (sensorTag_BattMeasure()) {
+			power_saving = PWMGR_S2;
+		} else {
+			power_saving = PWMGR_S3;
+			osal_stop_timerEx(sensorTag_TaskID, EVT_GSENSOR);
+		}
+
+		osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
+		osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
+		osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
+		osal_stop_timerEx(sensorTag_TaskID, EVT_SCREEN_SAVING);
+
+		osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
+		return (events ^ EVT_PWMGR);
+	}
+
+
+	//////////////
+	// g-sensor //
+	//////////////
+	if (events & EVT_GSENSOR) {
+		if (sensorTag_BattMeasure()) {
+			dmsg(("."));
+
+			if (adxl345_read(acc)) {
+				pedometer(acc);
+
+				normal.distance  =  (steps_normal * pi.stride) / 100UL;
+				workout.distance = ((steps_normal - steps_workout) * pi.stride) / 100UL;
+				normal.calorie   = (unsigned short) ((float) (normal.distance  / 1000UL * pi.weight) * 1.036);
+				workout.calorie  = (unsigned short) ((float) (workout.distance / 1000UL * pi.weight) * 1.036);
+
+				osal_start_timerEx(sensorTag_TaskID, EVT_GSENSOR, gsen_period);
+			}
+		}
+		return (events ^ EVT_GSENSOR);
 	}
 
 	///////////////////
 	// Screen Saving //
 	///////////////////
-	if (events & ST_SCREEN_EVT) {
-		if (!screen_saving) {
-			screen_saving = TRUE;
+	if (events & EVT_SCREEN_SAVING) {
+		if (power_saving == PWMGR_S0) {
+			power_saving = PWMGR_S1;
 			vgm064032a1w01_enter_sleep();
 			dmsg(("screen saving...\n"));
 		}
-		return (events ^ ST_SCREEN_EVT);
+		return (events ^ EVT_SCREEN_SAVING);
 	}
 
-	/////////////////
-	// Mode Switch //
-	/////////////////
-	if (events & ST_MODE_EVT) {
+	//////////////////////////////////
+	// Mode Switch (long press key) //
+	//////////////////////////////////
+	if (events & EVT_MODE) {
 		if (key1_press) {
 			vgm064032a1w01_clr_screen();
 			if ((opmode & 0xF0) == MODE_NORMAL) {
 				opmode        = MODE_WORKOUT | MODE_TIME;
 				steps_workout = steps_normal;
-				time_workout  = osal_getClock();
-				dmsg(("[workout mode]\n"));
+				workout.time  = osal_getClock();
+				dmsg(("\033[40;32m[workout mode]\033[0m\n"));
 			} else {
 				opmode        = MODE_NORMAL | MODE_TIME;
-				dmsg(("[normal mode]\n"));
+				dmsg(("\033[40;32m[normal mode]\033[0m\n"));
 			}
+
+			// power management
+			osal_start_timerEx(sensorTag_TaskID, EVT_SCREEN_SAVING, PERIOD_SCREEN_SAVING);
+			osal_start_timerEx(sensorTag_TaskID, EVT_PWMGR,		PERIOD_PWMGR);
 		}
-		return (events ^ ST_MODE_EVT);
+		return (events ^ EVT_MODE);
 	}
 
-	if (events & ST_SLEEP_EVT) {
+	if (events & EVT_SLEEP) {
 		if (key1_press) {
 			vgm064032a1w01_clr_screen();
 			opmode = MODE_SLEEP;
-			dmsg(("[sleep mode]\n"));
+			dmsg(("\033[40;32m[sleep mode]\033[0m\n"));
+
+			// power management
+			osal_start_timerEx(sensorTag_TaskID, EVT_SCREEN_SAVING, PERIOD_SCREEN_SAVING);
+			osal_start_timerEx(sensorTag_TaskID, EVT_PWMGR,		PERIOD_PWMGR);
 		}
-		return (events ^ ST_SLEEP_EVT);
+		return (events ^ EVT_SLEEP);
+	}
+
+	if (events & EVT_SYSRST) {
+		if (key1_press) {
+			dmsg(("\033[40;32m[system reset]\033[0m\n"));
+			HAL_SYSTEM_RESET();
+		}
+		return (events ^ EVT_SYSRST);
 	}
 
 
 	/////////////
 	// Display //
 	/////////////
-	if (events & ST_DISP_EVT) {
+	if (events & EVT_DISP) {
 		sensorTag_HandleDisp(opmode, acc);
-		osal_start_timerEx(sensorTag_TaskID, ST_DISP_EVT, 100);
-		return (events ^ ST_DISP_EVT);
+		osal_start_timerEx(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
+		return (events ^ EVT_DISP);
 	}
 
 	// discard unknown events
 	return 0;
 }
+
+
+/**
+ * @fn      
+ *
+ * @brief   
+ *
+ * @param   
+ *
+ * @return  
+ */
+void custom_enter_sleep(void)
+{
+//	dmsg(("0"));
+
+	vgm064032a1w01_enter_sleep();
+	adxl345_enter_sleep();
+}
+
+void custom_exit_sleep(void)
+{
+//	dmsg(("1"));
+
+	adxl345_exit_sleep();
+	vgm064032a1w01_exit_sleep();
+}
+
 

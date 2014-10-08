@@ -88,8 +88,7 @@ reliably.
 #include "hal_keys.h"
 #include "osal.h"
 
-#include "vgm064032a1w01.h"
-#include "adxl345.h"
+#include "custom.h"
 
 #if (defined HAL_KEY) && (HAL_KEY == TRUE)
 
@@ -357,8 +356,7 @@ void halProcessKeyInterrupt(void)
 **************************************************************************************************/
 void HalKeyEnterSleep ( void )
 {
-	vgm064032a1w01_enter_sleep();
-	adxl345_enter_sleep();
+	custom_enter_sleep();
 }
 
 /**************************************************************************************************
@@ -372,8 +370,7 @@ void HalKeyEnterSleep ( void )
 **************************************************************************************************/
 uint8 HalKeyExitSleep ( void )
 {
-	adxl345_exit_sleep();
-	vgm064032a1w01_exit_sleep();
+	custom_exit_sleep();
 
 	/* Wake up and read keys */
 	return (HalKeyRead());
