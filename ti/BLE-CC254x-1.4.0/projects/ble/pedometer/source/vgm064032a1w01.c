@@ -92,11 +92,19 @@ void vgm064032a1w01_init(void)
 
 void vgm064032a1w01_enter_sleep(void)
 {
+	// charge pump
+	ssd1306_command(0x8D);		// charge pump setting
+	ssd1306_command(0x10);
+
 	ssd1306_command(0xAE);		// set display off
 }
 
 void vgm064032a1w01_exit_sleep(void)
 {
+	// charge pump
+	ssd1306_command(0x8D);		// charge pump setting
+	ssd1306_command(0x14);
+
 	ssd1306_command(0xAF);		// set display on
 }
 

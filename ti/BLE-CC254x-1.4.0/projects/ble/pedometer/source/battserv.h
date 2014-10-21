@@ -1,13 +1,12 @@
 /**************************************************************************************************
-  Filename:       devinfoservice-st.h
+  Filename:       battserv.h
   Revised:        $Date $
   Revision:       $Revision $
 
-  Description:    This file contains the Device Information service definitions and
+  Description:    This file contains the Battery service definitions and
                   prototypes.
 
-
-  Copyright 2012 - 2013 Texas Instruments Incorporated. All rights reserved.
+ Copyright 2011-2013 Texas Instruments Incorporated. All rights reserved.
 
   IMPORTANT: Your use of this Software is limited to those specific rights
   granted under the terms of a software license agreement between the user
@@ -38,8 +37,8 @@
   contact Texas Instruments Incorporated at www.TI.com.
 **************************************************************************************************/
 
-#ifndef DEVINFOSERVICE_H
-#define DEVINFOSERVICE_H
+#ifndef __BATTSERV_H__
+#define __BATTSERV_H__
 
 #ifdef __cplusplus
 extern "C"
@@ -54,32 +53,34 @@ extern "C"
  * CONSTANTS
  */
 
-// Device Information Service Parameters
-#define DEVINFO_SYSTEM_ID			0
-#define DEVINFO_MODEL_NUMBER			1
-#define DEVINFO_SERIAL_NUMBER			2
-#define DEVINFO_FIRMWARE_REV			3
-#define DEVINFO_HARDWARE_REV			4
-#define DEVINFO_SOFTWARE_REV			5
-#define DEVINFO_MANUFACTURER_NAME		6
-#define DEVINFO_11073_CERT_DATA			7
-#define DEVINFO_PNP_ID				8
+// Battery Service Get/Set Parameters
+#define BATT_PARAM_LEVEL			0
+#define BATT_PARAM_CRITICAL_LEVEL		1
+#define BATT_PARAM_SERVICE_HANDLE		2
+#define BATT_PARAM_BATT_LEVEL_IN_REPORT		3
 
-// IEEE 11073 authoritative body values
-#define DEVINFO_11073_BODY_EMPTY		0
-#define DEVINFO_11073_BODY_IEEE			1
-#define DEVINFO_11073_BODY_CONTINUA		2
-#define DEVINFO_11073_BODY_EXP			254
+// Callback events
+#define BATT_LEVEL_NOTI_ENABLED			1
+#define BATT_LEVEL_NOTI_DISABLED		2
 
-// System ID length
-#define DEVINFO_SYSTEM_ID_LEN			8
-
-  // PnP ID length
-#define DEVINFO_PNP_ID_LEN			7
+// HID Report IDs for the service
+#define HID_RPT_ID_BATT_LEVEL_IN		4	// Battery Level input report ID
 
 /*********************************************************************
  * TYPEDEFS
  */
+
+// Battery Service callback function
+typedef void	(*battServiceCB_t)(uint8 event);
+
+// Battery measure HW setup function
+typedef void	(*battServiceSetupCB_t)(void);
+
+// Battery measure percentage calculation function
+typedef uint8	(*battServiceCalcCB_t)(uint16 adcVal);
+
+// Battery measure HW teardown function
+typedef void	(*battServiceTeardownCB_t)(void);
 
 /*********************************************************************
  * MACROS
@@ -94,18 +95,31 @@ extern "C"
  * API FUNCTIONS
  */
 
-/*
- * DevInfo_AddService- Initializes the Device Information service by registering
+/*********************************************************************
+ * @fn      Batt_AddService
+ *
+ * @brief   Initializes the Battery service by registering
  *          GATT attributes with the GATT server.
  *
+ * @return  Success or Failure
  */
-
-extern bStatus_t	DevInfo_AddService(void);
+extern bStatus_t	Batt_AddService(void);
 
 /*********************************************************************
- * @fn      DevInfo_SetParameter
+ * @fn      Batt_Register
  *
- * @brief   Set a Device Information parameter.
+ * @brief   Register a callback function with the Battery Service.
+ *
+ * @param   pfnServiceCB - Callback function.
+ *
+ * @return  None.
+ */
+extern void		Batt_Register(battServiceCB_t pfnServiceCB);
+
+/*********************************************************************
+ * @fn      Batt_SetParameter
+ *
+ * @brief   Set a Battery Service parameter.
  *
  * @param   param - Profile parameter ID
  * @param   len - length of data to right
@@ -116,24 +130,44 @@ extern bStatus_t	DevInfo_AddService(void);
  *
  * @return  bStatus_t
  */
-extern bStatus_t	DevInfo_SetParameter(uint8 param, uint8 len, void *value);
+extern bStatus_t	Batt_SetParameter(uint8 param, uint8 len, void *value);
 
-/*
- * DevInfo_GetParameter - Get a Device Information parameter.
+/*********************************************************************
+ * @fn      Batt_GetParameter
  *
- *    param - Profile parameter ID
- *    value - pointer to data to write.  This is dependent on
+ * @brief   Get a Battery parameter.
+ *
+ * @param   param - Profile parameter ID
+ * @param   value - pointer to data to get.  This is dependent on
  *          the parameter ID and WILL be cast to the appropriate
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
+ *
+ * @return  bStatus_t
  */
-extern bStatus_t	DevInfo_GetParameter(uint8 param, void *value);
+extern bStatus_t	Batt_GetParameter(uint8 param, void *value);
 
 /*********************************************************************
-*********************************************************************/
+ * @fn          Batt_HandleConnStatusCB
+ *
+ * @brief       Battery Service link status change handler function.
+ *
+ * @param       connHandle - connection handle
+ * @param       changeType - type of change
+ *
+ * @return      none
+ */
+extern void		Batt_HandleConnStatusCB(uint16 connHandle, uint8 changeType);
+
+
+
+extern void		Batt_SetLevel(uint8 level);
+
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* DEVINFOSERVICE_H */
+#endif /* __BATTSERV_H__ */
+

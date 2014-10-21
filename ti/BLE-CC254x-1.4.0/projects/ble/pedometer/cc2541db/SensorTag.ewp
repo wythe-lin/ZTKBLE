@@ -3267,13 +3267,7 @@
       <name>$PROJ_DIR$\..\source\adxl345.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\adxl345.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\source\fonts.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\source\fonts.h</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\OSAL_SensorTag.c</name>
@@ -3282,16 +3276,10 @@
       <name>$PROJ_DIR$\..\source\pedometer.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\pedometer.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\source\putchar.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\SensorTag.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\source\SensorTag.h</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\SensorTag_Main.c</name>
@@ -3300,19 +3288,10 @@
       <name>$PROJ_DIR$\..\source\ssd1306.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\ssd1306.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\source\uart.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\uart.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\source\vgm064032a1w01.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\source\vgm064032a1w01.h</name>
     </file>
   </group>
   <group>
@@ -3486,10 +3465,10 @@
   <group>
     <name>PROFILES</name>
     <file>
-      <name>$PROJ_DIR$\..\source\devinfoservice-st.c</name>
+      <name>$PROJ_DIR$\..\source\battserv.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\devinfoservice-st.h</name>
+      <name>$PROJ_DIR$\..\source\devinfo.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\Profiles\Roles\gap.c</name>
@@ -3498,37 +3477,22 @@
       <name>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.h</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\Include\gapgattserver.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\..\..\..\Components\ble\host\gatt_uuid.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\Include\gattservapp.h</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\Profiles\OAD\oad.h</name>
+      <name>$PROJ_DIR$\..\source\kxti9-1001.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.h</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\..\Profiles\Roles\peripheral.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\Profiles\Roles\peripheral.h</name>
+      <name>$PROJ_DIR$\..\source\ptprofile.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.h</name>
     </file>
   </group>
   <group>

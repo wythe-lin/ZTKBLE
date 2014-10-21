@@ -1,5 +1,5 @@
 /**************************************************************************************************
-  Filename:       devinfoservice-st.c
+  Filename:       devinfo.c
   Revised:        $Date $
   Revision:       $Revision $
 
@@ -50,7 +50,7 @@
 #include "gatt_profile_uuid.h"
 #include "gattservapp.h"
 
-#include "devinfoservice-st.h"
+#include "devinfo.h"
 
 /*
  * macros
@@ -159,11 +159,11 @@ static uint8		devInfoSystemId[DEVINFO_SYSTEM_ID_LEN] = { 0, 0, 0, 0, 0, 0, 0, 0 
 
 // Model Number String characteristic
 static uint8		devInfoModelNumberProps = GATT_PROP_READ;
-static const uint8	devInfoModelNumber[] = "N.A.";
+static const uint8	devInfoModelNumber[] = "BT7107";
 
 // Serial Number String characteristic
 static uint8		devInfoSerialNumberProps = GATT_PROP_READ;
-static const uint8	devInfoSerialNumber[] = "00000000";
+static const uint8	devInfoSerialNumber[] = "0000";
 
 // Software Revision String characteristic
 static uint8		devInfoSoftwareRevProps = GATT_PROP_READ;
@@ -175,30 +175,12 @@ static const uint8	devInfoFirmwareRev[] = "1.0 ("__DATE__")";
 
 // Hardware Revision String characteristic
 static uint8		devInfoHardwareRevProps = GATT_PROP_READ;
-static const uint8	devInfoHardwareRev[] = "1.0";
+static const uint8	devInfoHardwareRev[] = "1.2";
 
 // Manufacturer Name String characteristic
 static uint8		devInfoMfrNameProps = GATT_PROP_READ;
 static const uint8	devInfoMfrName[] = "ZealTek Co., Ltd.";
 
-
-// IEEE 11073-20601 Regulatory Certification Data List characteristic
-static uint8		devInfo11073CertProps = GATT_PROP_READ;
-static const uint8	devInfo11073Cert[] = {
-	DEVINFO_11073_BODY_EXP,		// authoritative body type
-	0x00,				// authoritative body structure type
-					// authoritative body data follows below:
-	'e', 'x', 'p', 'e', 'r', 'i', 'm', 'e', 'n', 't', 'a', 'l'
-};
-
-// System ID characteristic
-static uint8		devInfoPnpIdProps = GATT_PROP_READ;
-static uint8		devInfoPnpId[DEVINFO_PNP_ID_LEN] = {
-	1,					// Vendor ID source (1=Bluetooth SIG)
-	LO_UINT16(0x000D), HI_UINT16(0x000D),	// Vendor ID (Texas Instruments)
-	LO_UINT16(0x0000), HI_UINT16(0x0000),	// Product ID (vendor-specific)
-	LO_UINT16(0x0110), HI_UINT16(0x0110)	// Product version (JJ.M.N)
-};
 
 /*
  * Profile Attributes - Table
@@ -329,40 +311,6 @@ static gattAttribute_t		devInfoAttrTbl[] = {
 		GATT_PERMIT_READ,
 		0,
 		(uint8 *) devInfoSoftwareRev
-	},
-
-	/*** IEEE 11073-20601 Regulatory Certification Data List */
-	// Declaration
-	{
-		{ ATT_BT_UUID_SIZE, characterUUID },
-		GATT_PERMIT_READ,
-		0,
-		&devInfo11073CertProps
-	},
-
-	// Value
-	{
-		{ ATT_BT_UUID_SIZE, devInfo11073CertUUID },
-		GATT_PERMIT_READ,
-		0,
-		(uint8 *) devInfo11073Cert
-	},
-
-	/*** PnP ID *******************************************/
-	// Declaration
-	{
-		{ ATT_BT_UUID_SIZE, characterUUID },
-		GATT_PERMIT_READ,
-		0,
-		&devInfoPnpIdProps
-	},
-
-	// PnP ID Value
-	{
-		{ ATT_BT_UUID_SIZE, devInfoPnpIdUUID },
-		GATT_PERMIT_READ,
-		0,
-		(uint8 *) devInfoPnpId
 	}
 };
 
@@ -468,28 +416,6 @@ static uint8 devInfo_ReadAttrCB(uint16 connHandle, gattAttribute_t *pAttr, uint8
 			// determine read length
 			*pLen = MIN(maxLen, (sizeof(devInfoMfrName) - offset));
 			osal_memcpy(pValue, &devInfoMfrName[offset], *pLen);
-		}
-		break;
-
-	case IEEE_11073_CERT_DATA_UUID:
-		// verify offset
-		if (offset >= sizeof(devInfo11073Cert)) {
-			status = ATT_ERR_INVALID_OFFSET;
-		} else {
-			// determine read length
-			*pLen = MIN(maxLen, (sizeof(devInfo11073Cert) - offset));
-			osal_memcpy(pValue, &devInfo11073Cert[offset], *pLen);
-		}
-		break;
-
-	case PNP_ID_UUID:
-		// verify offset
-		if (offset >= sizeof(devInfoPnpId)) {
-			status = ATT_ERR_INVALID_OFFSET;
-		} else {
-			// determine read length
-			*pLen = MIN(maxLen, (sizeof(devInfoPnpId) - offset));
-			osal_memcpy(pValue, &devInfoPnpId[offset], *pLen);
 		}
 		break;
 
@@ -624,14 +550,6 @@ bStatus_t DevInfo_GetParameter(uint8 param, void *value)
 
 	case DEVINFO_MANUFACTURER_NAME:
 		osal_memcpy(value, devInfoMfrName, sizeof(devInfoMfrName));
-		break;
-
-	case DEVINFO_11073_CERT_DATA:
-		osal_memcpy(value, devInfo11073Cert, sizeof(devInfo11073Cert));
-		break;
-
-	case DEVINFO_PNP_ID:
-		osal_memcpy(value, devInfoPnpId, sizeof(devInfoPnpId));
 		break;
 
 	default:

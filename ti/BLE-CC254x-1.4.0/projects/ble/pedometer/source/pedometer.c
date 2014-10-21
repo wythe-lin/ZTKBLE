@@ -343,7 +343,7 @@ void pedometer(unsigned short *buf)
 	}
 
 	if (steps_normal != STEPS) {
-		twmsg(("\033[1;33mstep=%0lu\n\033[0m", steps_normal));
+		twmsg(("\033[1;33mstep=%0lu\n\033[0m", STEPS));
 	}
 	steps_normal = STEPS;
 }

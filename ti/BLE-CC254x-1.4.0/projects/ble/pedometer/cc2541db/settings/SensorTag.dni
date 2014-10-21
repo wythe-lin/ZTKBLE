@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=-1246522178
+Checksum=-1751818595
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -21,12 +21,6 @@ Show=1 1
 Sort=4 0
 [struct_types]
 Fmt0=struct sport_info-distance	3	0
-[Breakpoints]
-Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
-Count=1
-[ChipconEmu]
-Stop timers on halt=0
-Leave target running=1
 [Log file]
 LoggingEnabled=_ 0
 LogFile=_ ""
@@ -34,6 +28,12 @@ Category=_ 0
 [TermIOLog]
 LoggingEnabled=_ 0
 LogFile=_ ""
+[Breakpoints]
+Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
+Count=1
+[ChipconEmu]
+Stop timers on halt=1
+Leave target running=1
 [Aliases]
 Count=0
 SuppressDialog=0

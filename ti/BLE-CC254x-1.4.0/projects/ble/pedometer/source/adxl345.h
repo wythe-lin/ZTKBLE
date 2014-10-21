@@ -246,6 +246,8 @@ extern char		adxl345_read(unsigned short *p);
 extern void		adxl345_enter_sleep(void);
 extern void		adxl345_exit_sleep(void);
 
+extern void		adxl345_self_calibration(void);
+
 
 #ifdef __cplusplus
 };

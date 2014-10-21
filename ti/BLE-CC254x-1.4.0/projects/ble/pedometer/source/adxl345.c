@@ -104,6 +104,7 @@ char adxl345_init(void)
 		dmsg(("adxl345 devid=%02x is not 0xE5\n", devid));
 		return 0;
 	}
+
 	adxl345_reg_write(XL345_FIFO_CTL,	XL345_FIFO_RESET);				// FIFO reset & bypass
 	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_100);				// output data rate: 100Hz
 	adxl345_reg_write(XL345_DATA_FORMAT,	XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: +/-16g range, right justified,  256->1g
@@ -120,18 +121,22 @@ char adxl345_read(unsigned short *p)
 	unsigned char	x0, x1;
 	unsigned char	y0, y1;
 	unsigned char	z0, z1;
-	char		ret = 0;
+	char		ret;
+
+	// check data ready
+	ret = -1;
 
 	adxl345_select();
 	if (!adxl345_reg_read(XL345_INT_SOURCE, &intsrc)) {
 		return ret;
 	}
-
 	if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {	// water mark interrupt
 		return ret;
 	}
 
 	// read the three registers
+	ret = 1;
+
 	if (!adxl345_reg_read(XL345_DATAX0, &x0)) {
 		return ret;
 	}
@@ -154,7 +159,7 @@ char adxl345_read(unsigned short *p)
 	}
 
 	// valid data
-	ret  = 1;
+	ret  = 0;
 
 	p[0] = ((unsigned short) x1) << 8 | x0;
 	p[1] = ((unsigned short) y1) << 8 | y0;
@@ -190,3 +195,77 @@ void adxl345_exit_sleep(void)
 	}
 
 }
+
+
+#define ADXL345_CALIB_NUM	16
+void adxl345_self_calibration(void)
+{
+	unsigned char	x0, x1;
+	unsigned char	y0, y1;
+	unsigned char	z0, z1;
+	unsigned char	intsrc, n;
+	long		cx, cy, cz;
+
+	// enter self calibration
+	adxl345_select();
+	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_100);				// output data rate: 100Hz
+	adxl345_reg_write(XL345_DATA_FORMAT,	XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// All g-ranges, full resolution,  256LSB/g
+	adxl345_reg_write(XL345_OFSX,		0);
+	adxl345_reg_write(XL345_OFSY,		0);
+	adxl345_reg_write(XL345_OFSZ,		0);
+
+	// get samples
+	cx = 0;	cy = 0;	cz = 0;
+	for (n=0; n<ADXL345_CALIB_NUM; n++) {
+retry:
+		adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
+		if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {
+			adxl345_delay(50);
+			goto retry;
+		}
+		adxl345_reg_read(XL345_DATAX0, &x0);
+		adxl345_reg_read(XL345_DATAX1, &x1);
+		adxl345_reg_read(XL345_DATAY0, &y0);
+		adxl345_reg_read(XL345_DATAY1, &y1);
+		adxl345_reg_read(XL345_DATAZ0, &z0);
+		adxl345_reg_read(XL345_DATAZ1, &z1);
+
+		cx += ((unsigned short) x1) << 8 | x0;
+		cy += ((unsigned short) y1) << 8 | y0;
+		cz += ((unsigned short) z1) << 8 | z0;
+	}
+
+	cx = cx / ADXL345_CALIB_NUM;
+	cy = cy / ADXL345_CALIB_NUM;
+	cz = cz / ADXL345_CALIB_NUM;
+
+	// result
+	cx = (cx / 4) * (-1);
+	cy = (cy / 4) * (-1);
+	cz = (cz / 4) * (-1);
+
+	adxl345_reg_write(XL345_OFSX, (char) cx);
+	adxl345_reg_write(XL345_OFSY, (char) cy);
+	adxl345_reg_write(XL345_OFSZ, (char) cz);
+
+not_ready:
+	adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
+	if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {
+		adxl345_delay(50);
+		goto not_ready;
+	}
+	adxl345_reg_read(XL345_DATAX0, &x0);
+	adxl345_reg_read(XL345_DATAX1, &x1);
+	adxl345_reg_read(XL345_DATAY0, &y0);
+	adxl345_reg_read(XL345_DATAY1, &y1);
+	adxl345_reg_read(XL345_DATAZ0, &z0);
+	adxl345_reg_read(XL345_DATAZ1, &z1);
+
+	cx = ((unsigned short) x1) << 8 | x0;
+	cy = ((unsigned short) y1) << 8 | y0;
+	cz = ((unsigned short) z1) << 8 | z0;
+
+
+}
+
+

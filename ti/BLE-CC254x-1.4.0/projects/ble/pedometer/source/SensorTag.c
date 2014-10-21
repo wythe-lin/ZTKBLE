@@ -72,8 +72,10 @@
 #endif
 
 // Services
-#include "devinfoservice-st.h"
+#include "devinfo.h"
 #include "simplekeys.h"
+#include "ptprofile.h"
+#include "battserv.h"
 
 // Sensor drivers
 #include "sensorTag.h"
@@ -214,7 +216,7 @@ static uint8		scanRspData[] = {
 	// complete name
 	0x08,			// length of this data
 	GAP_ADTYPE_LOCAL_NAME_COMPLETE,
-	'Z',
+	'P',
 	'T',
 	'-',
 	'5',
@@ -245,6 +247,19 @@ static uint8		advertData[] = {
 	0x02,			// length of this data
 	GAP_ADTYPE_FLAGS,
 	DEFAULT_DISCOVERABLE_MODE | GAP_ADTYPE_FLAGS_BREDR_NOT_SUPPORTED,
+/*
+	// service UUID, to notify central devices what services are included
+	// in this peripheral
+	0x03,				// length of this data
+	GAP_ADTYPE_16BIT_MORE,		// some of the UUID's, but not all
+	LO_UINT16(PTPROFILE_SERV1_UUID),
+	HI_UINT16(PTPROFILE_SERV1_UUID),
+
+	0x03,				// length of this data
+	GAP_ADTYPE_16BIT_MORE,		// some of the UUID's, but not all
+	LO_UINT16(PTPROFILE_SERV2_UUID),
+	HI_UINT16(PTPROFILE_SERV2_UUID),
+*/
 };
 
 // GAP GATT Attributes
@@ -253,7 +268,7 @@ static uint8		attDeviceName[] = "Zealtek Pedometer A";
 #elif defined(HAL_IMAGE_B)
 static uint8		attDeviceName[] = "Zealtek Pedometer B";
 #else
-static uint8		attDeviceName[] = "Zealtek Pedometer";
+static uint8		attDeviceName[] = "PT-5200";
 #endif
 
 // sensor state variables
@@ -711,30 +726,78 @@ static void peripheral_state_notification(gaprole_States_t newState)
 			systemId[5] = ownAddress[3];
 
 			DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
+			dmsg(("\033[40;34m{started}\033[0m\n"));
 		}
 		break;
 
 	case GAPROLE_ADVERTISING:
 //		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
+		dmsg(("\033[40;34m{advertising}\033[0m\n"));
 		break;
 
 	case GAPROLE_CONNECTED:
 //		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
+		dmsg(("\033[40;34m{connected}\033[0m\n"));
 		break;
 
 	case GAPROLE_WAITING:
 		// Link terminated intentionally: reset all sensors
+		dmsg(("\033[40;34m{waiting}\033[0m\n"));
+		break;
 
+	case GAPROLE_CONNECTED_ADV:
+		dmsg(("\033[40;34m{connected adv.}\033[0m\n"));
+		break;
+
+
+	case GAPROLE_WAITING_AFTER_TIMEOUT:
+	case GAPROLE_ERROR:
+		dmsg(("\033[40;34m{error}\033[0m\n"));
 		break;
 
 	default:
 	case GAPROLE_INIT:
-	case GAPROLE_WAITING_AFTER_TIMEOUT:
-	case GAPROLE_CONNECTED_ADV:
-	case GAPROLE_ERROR:
+		dmsg(("\033[40;34m{init}\033[0m\n"));
 		break;
 	}
 	gapProfileState = newState;
+}
+
+
+/**
+ * @fn      ptProfileChangeCB
+ *
+ * @brief   Callback from SimpleBLEProfile indicating a value change
+ *
+ * @param   paramID - parameter ID of the value that was changed.
+ *
+ * @return  none
+ */
+static pt_t	pkt;
+
+static void ptProfileChangeCB(uint8 paramID)
+{
+	uint8	newValue;
+
+	switch (paramID) {
+	case SIMPLEPROFILE_CHAR1:
+		dmsg(("\033[40;31m(Write - 0xFFE9)\033[0m\n"));
+		ptProfile_GetParameter(SIMPLEPROFILE_CHAR1, &pkt);
+		ptProfile_PktParsing(&pkt);
+		if (pkt.header.len) {
+			ptProfile_SetParameter(SIMPLEPROFILE_CHAR1, pkt.header.len, (void *) &pkt);
+		}
+		break;
+
+	case SIMPLEPROFILE_CHAR2:
+		dmsg(("\033[40;31m(Notify - 0xFFE4)\033[0m\n"));
+		ptProfile_GetParameter(SIMPLEPROFILE_CHAR2, &newValue);
+		break;
+
+	default:
+		// should not reach here!
+		break;
+	}
 }
 
 
@@ -755,6 +818,11 @@ static gapRolesCBs_t	sensorTag_PeripheralCBs = {
 static gapBondCBs_t	sensorTag_BondMgrCBs = {
 	NULL,				// Passcode callback (not used by application)
 	NULL				// Pairing / Bonding state Callback (not used by application)
+};
+
+// ProTrack Profile Callbacks
+static ptProfileCBs_t	ptProfileCBs = {
+	ptProfileChangeCB		// Charactersitic value change callback
 };
 
 
@@ -836,11 +904,21 @@ void SensorTag_Init(uint8 task_id)
 		GAPBondMgr_SetParameter(GAPBOND_BONDING_ENABLED,  sizeof(uint8),  &bonding);
 	}
 
+	// Setup the ProTrack Profile Characteristic Values
+	{
+//		uint8	charValue1 = 1;
+//		uint8	charValue2 = 2;
+
+//		ptProfile_SetParameter(SIMPLEPROFILE_CHAR1, sizeof(uint8), &charValue1);
+//		ptProfile_SetParameter(SIMPLEPROFILE_CHAR2, sizeof(uint8), &charValue2);
+	}
 
 	// Add services
 	GGS_AddService(GATT_ALL_SERVICES);		// GAP
 	GATTServApp_AddService(GATT_ALL_SERVICES);	// GATT attributes
 	DevInfo_AddService();				// Device Information Service
+	ptProfile_AddService(GATT_ALL_SERVICES);	// ProTrack Profile
+	Batt_AddService();				// battery profile
 
 #if defined FEATURE_OAD
 	OADTarget_AddService();				// OAD Profile
@@ -862,6 +940,7 @@ void SensorTag_Init(uint8 task_id)
 //	kxti9_init();
 
 	// Register callbacks with profile
+	ptProfile_RegisterAppCBs(&ptProfileCBs);
 
 	// Enable clock divide on halt
 	// This reduces active current while radio is active and CC254x MCU
@@ -927,6 +1006,8 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
 		osal_set_event(sensorTag_TaskID, EVT_PWMGR);
 
+		adxl345_self_calibration();
+
 		return (events ^ EVT_START_DEVICE);
 	}
 
@@ -970,9 +1051,9 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	//////////////
 	if (events & EVT_GSENSOR) {
 		if (sensorTag_BattMeasure()) {
-			dmsg(("."));
+//			dmsg(("."));
 
-			if (adxl345_read(acc)) {
+			if (!adxl345_read(acc)) {
 				pedometer(acc);
 
 				normal.distance  =  (steps_normal * pi.stride) / 100UL;
@@ -1068,18 +1149,24 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
  */
 void custom_enter_sleep(void)
 {
-//	dmsg(("0"));
-
 	vgm064032a1w01_enter_sleep();
 	adxl345_enter_sleep();
+
+	// P0.4
+	P0SEL &= ~0x10;			// general-purpose I/O
+	P0    &= ~0x10;			// output low
+	P0DIR &= ~0x10;			// input
 }
 
 void custom_exit_sleep(void)
 {
-//	dmsg(("1"));
-
-	adxl345_exit_sleep();
 	vgm064032a1w01_exit_sleep();
+	adxl345_exit_sleep();
+
+	// P0.4
+	P0SEL &= ~0x10;			// general-purpose I/O
+	P0    &= ~0x10;			// output low
+	P0DIR |=  0x10;			// output
 }
 
 
