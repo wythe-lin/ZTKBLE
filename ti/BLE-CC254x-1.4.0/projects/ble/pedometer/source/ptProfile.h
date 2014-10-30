@@ -41,22 +41,17 @@ extern "C"
  * Constants
  ******************************************************************************
  */
-
 // profile parameters
-#define SIMPLEPROFILE_CHAR1		0	// RW uint8 - Profile Characteristic 1 value
-#define SIMPLEPROFILE_CHAR2		1	// RW uint8 - Profile Characteristic 2 value
+#define PTPROFILE_SERV1_CHAR		0
+#define PTPROFILE_SERV2_CHAR		1
 
 // ProTrack Profile Service UUID
 #define PTPROFILE_SERV1_UUID		0xFFE5
 #define PTPROFILE_SERV2_UUID		0xFFE0
 
-// Key Pressed UUID
-#define PTPROFILE_CHAR1_UUID		0xFFE9
-#define PTPROFILE_CHAR2_UUID		0xFFE4
-
-// Simple Keys Profile Services bit fields
-#define PTPROFILE_SERVICE1		0x00000001
-#define PTPROFILE_SERVICE2		0x00000002
+// Service Characteristic UUID
+#define PTPROFILE_SERV1_CHAR_UUID	0xFFE9
+#define PTPROFILE_SERV2_CHAR_UUID	0xFFE4
 
 
 // opcode & response
@@ -259,7 +254,7 @@ typedef struct {
 typedef struct {
 	unsigned char	id;
 	unsigned char	len;
-	unsigned char	date[3];
+//	unsigned char	date[3];
 	unsigned char	info[180];
 	unsigned char	chksum;
 } pt_get_week_ssdcg_ok_rsp_t;
@@ -456,11 +451,11 @@ typedef union {
  ******************************************************************************
  */
 // Callback when a characteristic value has changed
-typedef void (*ptProfileChange_t)(uint8 paramID);
+typedef void 	(*ptServ1Chg_t)(uint8 paramID);
 
 typedef struct {
-	ptProfileChange_t	pfnptProfileChange;		// Called when characteristic value changes
-} ptProfileCBs_t;
+	ptServ1Chg_t		pfnServ1Chg;		// Called when characteristic value changes
+} ptServ1CBs_t;
 
 
 
@@ -469,12 +464,13 @@ typedef struct {
  * API Functions
  ******************************************************************************
  */
-extern bStatus_t	ptProfile_AddService(uint32 services);
-extern bStatus_t	ptProfile_RegisterAppCBs(ptProfileCBs_t *appCallbacks);
-extern bStatus_t	ptProfile_SetParameter(uint8 param, uint8 len, void *value);
-extern bStatus_t	ptProfile_GetParameter(uint8 param, void *value);
+extern bStatus_t	ptProfile_AddService(void);
+extern bStatus_t	ptProfile_RegisterAppCBs(ptServ1CBs_t *appCallbacks);
+extern bStatus_t	ptServ2_SetParameter(uint8 param, uint8 len, void *value);
+extern bStatus_t	ptServ1_GetParameter(uint8 param, void *value);
 
-extern void		ptProfile_PktParsing(pt_t *out);
+extern unsigned char	ptProfile_CalcChksum(unsigned char len, unsigned char *val);
+
 
 #ifdef __cplusplus
 }

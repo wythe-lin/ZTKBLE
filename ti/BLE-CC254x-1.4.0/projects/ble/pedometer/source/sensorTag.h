@@ -61,11 +61,11 @@ extern "C"
 #define EVT_SYSRST				0x0002
 #define EVT_MODE				0x0004
 #define EVT_SLEEP				0x0008
+#define EVT_RTC					0x0010
 
 #define EVT_GSENSOR				0x0100
 #define EVT_DISP				0x0200
 #define EVT_PWMGR				0x0400
-#define EVT_SCREEN_SAVING			0x0800
 
 
 #define MODE_NORMAL				0x00
@@ -79,10 +79,51 @@ extern "C"
 #define MODE_DBG				0x04
 
 
+struct pi_alarm {
+	unsigned char	enable;
+	unsigned char	hour;
+	unsigned char	minute;
+	unsigned char	clock_reminding;
+	unsigned char	repeat_week;
+};
+
+struct pi_alert {
+	unsigned char	enable;
+	unsigned char	type;
+	unsigned char	start_hour;
+	unsigned char	start_minute;
+	unsigned char	end_hour;
+	unsigned char	end_minute;
+	unsigned char	repeat_week;
+};
+
+struct pi_others {
+	unsigned char	gender;
+	unsigned char	height;			// unit: cm
+	unsigned char	weight;			// unit: kg
+	unsigned char	stride;			// unit: cm
+	unsigned char	running_stride;		// unit: cm
+	unsigned char	sleep_start_hour;
+	unsigned char	sleep_start_minute;
+	unsigned char	wakeup_start_hour;
+	unsigned char	wakeup_start_minute;
+	unsigned char	goal_steps;
+	unsigned char	bt_auto_close;
+	unsigned char	bt_auto_close_time;	// unit: minute
+};
+
 struct personal_info {
-	unsigned short	height;		// unit: cm
-	unsigned short	weight;		// unit: kg
-	unsigned short	stride;		// unit: cm - man = height x 0.415, woman = height x 0.413
+	unsigned short		height;		// unit: cm
+	unsigned short		weight;		// unit: kg
+	unsigned short		stride;		// unit: cm - man = height x 0.415, woman = height x 0.413
+
+	struct pi_alarm		alarm1;
+	struct pi_alarm		alarm2;
+	struct pi_alarm		alarm3;
+	struct pi_alarm		alarm4;
+	struct pi_alert		idle;
+	struct pi_alert		activity;
+	struct pi_others	others;
 };
 
 struct sport_info {
@@ -90,6 +131,7 @@ struct sport_info {
 	unsigned long	distance;	// step   x stride
 	unsigned short	calorie;	// weight x distance x 1.036
 	UTCTime		time;
+	unsigned char	week;
 };
 
 typedef enum {

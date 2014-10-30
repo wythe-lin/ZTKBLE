@@ -708,7 +708,7 @@ void GAPRole_Init( uint8 task_id )
   gapRole_signCounter = 0;
   gapRole_AdvEventType = GAP_ADTYPE_ADV_IND;
   gapRole_AdvDirectType = ADDRTYPE_PUBLIC;
-  gapRole_AdvChanMap = GAP_ADVCHAN_ALL;
+  gapRole_AdvChanMap = GAP_ADVCHAN_39/*GAP_ADVCHAN_ALL*/;
   gapRole_AdvFilterPolicy = GAP_FILTER_POLICY_ALL;
 
   // Restore Items from NV

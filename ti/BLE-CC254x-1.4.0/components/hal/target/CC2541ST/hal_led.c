@@ -469,7 +469,7 @@ void HalLedExitSleep( void )
 {
 #if (HAL_LED == TRUE)
 	/* Load back the saved state */
-	HalLedOnOff(HalSleepLedState, HAL_LED_MODE_ON);
+	HalLedOnOff(HAL_LED_ALL, HalSleepLedState);
 	
 	/* Restart - This takes care BLINKING LEDS */
 	HalLedUpdate();

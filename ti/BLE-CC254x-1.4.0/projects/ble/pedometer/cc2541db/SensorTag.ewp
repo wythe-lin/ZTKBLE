@@ -288,6 +288,7 @@
           <state>HAL_LED=TRUE</state>
           <state>HAL_I2C=TRUE</state>
           <state>HAL_ADC=TRUE</state>
+          <state>HAL_SLEEP_DEBUG_LED</state>
         </option>
         <option>
           <name>CCPreprocFile</name>

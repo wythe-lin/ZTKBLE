@@ -373,7 +373,7 @@ void halSleep(uint32 osal_timeout)
 			HalI2CDisable();
 	
 			// Disable  DCDC
-			DCDC_SBIT = 0;
+//			DCDC_SBIT = 0;		// modify by xyz for hardware different - 2014.10.30
 
 #ifdef DEBUG_GPIO
 			// TEMP
@@ -436,7 +436,7 @@ void halSleep(uint32 osal_timeout)
 #endif // DEBUG_GPIO
 
 	// Enable DCDC
-	DCDC_SBIT = 1;
+//	DCDC_SBIT = 1;		// modify by xyz for hardware different - 2014.10.30
 
 	return;
 }
