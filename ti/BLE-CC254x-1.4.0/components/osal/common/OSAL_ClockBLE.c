@@ -49,7 +49,7 @@
  * MACROS
  */
 
-#define	YearLength(yr)	(IsLeapYear(yr) ? 366 : 365)
+#define	YearLength(yr)		(IsLeapYear(yr) ? 366 : 365)
 
 /*********************************************************************
  * CONSTANTS
@@ -57,11 +57,11 @@
 
 // (MAXCALCTICKS * 5) + (max remainder) must be <= (uint16 max),
 // so: (13105 * 5) + 7 <= 65535
-#define MAXCALCTICKS  ((uint16)(13105))
+#define MAXCALCTICKS		((uint16)(13105))
 
-#define	BEGYEAR	        2000     // UTC started at 00:00:00 January 1, 2000
+#define	BEGYEAR			2000		// UTC started at 00:00:00 January 1, 2000
 
-#define	DAY             86400UL  // 24 hours * 60 minutes * 60 seconds
+#define	DAY			86400UL		// 24 hours * 60 minutes * 60 seconds
 
 /*********************************************************************
  * TYPEDEFS
@@ -227,35 +227,35 @@ UTCTime osal_getClock( void )
  *
  * @return  none
  */
-void osal_ConvertUTCTime( UTCTimeStruct *tm, UTCTime secTime )
+void osal_ConvertUTCTime(UTCTimeStruct *tm, UTCTime secTime)
 {
-  // calculate the time less than a day - hours, minutes, seconds
-  {
-    uint32 day = secTime % DAY;
-    tm->seconds = day % 60UL;
-    tm->minutes = (day % 3600UL) / 60UL;
-    tm->hour = day / 3600UL;
-  }
+	// calculate the time less than a day - hours, minutes, seconds
+	{
+		uint32	day = secTime % DAY;
+		tm->seconds = day % 60UL;
+		tm->minutes = (day % 3600UL) / 60UL;
+		tm->hour    = day / 3600UL;
+	}
 
-  // Fill in the calendar - day, month, year
-  {
-    uint16 numDays = secTime / DAY;
-    tm->year = BEGYEAR;
-    while ( numDays >= YearLength( tm->year ) )
-    {
-      numDays -= YearLength( tm->year );
-      tm->year++;
-    }
+	// Fill in the calendar - day, month, year
+	{
+		uint16	numDays = secTime / DAY;
+		tm->year = BEGYEAR;
+		while (numDays >= YearLength(tm->year)) {
+			numDays -= YearLength(tm->year);
+			tm->year++;
+		}
 
-    tm->month = 0;
-    while ( numDays >= monthLength( IsLeapYear( tm->year ), tm->month ) )
-    {
-      numDays -= monthLength( IsLeapYear( tm->year ), tm->month );
-      tm->month++;
-    }
+//		tm->month = 0;								// modify by xyz - 2014.10.31
+		tm->month = 1;
+//		while (numDays >= monthLength(IsLeapYear(tm->year), tm->month)) {	// modify by xyz - 2014.10.31
+		while (numDays > monthLength(IsLeapYear(tm->year), tm->month)) {
+			numDays -= monthLength(IsLeapYear(tm->year), tm->month);
+			tm->month++;
+		}
 
-    tm->day = numDays;
-  }
+		tm->day = numDays;
+	}
 }
 
 /*********************************************************************
@@ -267,8 +267,15 @@ void osal_ConvertUTCTime( UTCTimeStruct *tm, UTCTime secTime )
  *
  * @return  number of days in specified month
  */
+static const unsigned char	monday[2][12] = {
+	{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
+	{ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+};
+
 static uint8 monthLength( uint8 lpyr, uint8 mon )
 {
+// #BEGIN# modify by xyz - 2014.10.31
+#if 0
   uint8 days = 31;
 
   if ( mon == 1 ) // feb
@@ -287,8 +294,13 @@ static uint8 monthLength( uint8 lpyr, uint8 mon )
       days = 30;
     }
   }
-
   return ( days );
+#else
+	uint8	days = monday[lpyr][mon-1];
+
+	return (days);
+#endif
+// #BEGIN# modify by xyz - 2014.10.31
 }
 
 /*********************************************************************
@@ -300,39 +312,38 @@ static uint8 monthLength( uint8 lpyr, uint8 mon )
  *
  * @return  number of seconds since 00:00:00 on 01/01/2000 (UTC)
  */
-UTCTime osal_ConvertUTCSecs( UTCTimeStruct *tm )
+UTCTime osal_ConvertUTCSecs(UTCTimeStruct *tm)
 {
-  uint32 seconds;
+	uint32 seconds;
 
-  /* Seconds for the partial day */
-  seconds = (((tm->hour * 60UL) + tm->minutes) * 60UL) + tm->seconds;
+	/* Seconds for the partial day */
+	seconds = (((tm->hour * 60UL) + tm->minutes) * 60UL) + tm->seconds;
 
-  /* Account for previous complete days */
-  {
-    /* Start with complete days in current month */
-    uint16 days = tm->day;
+	/* Account for previous complete days */
+	{
+		/* Start with complete days in current month */
+		uint16	days = tm->day;
 
-    /* Next, complete months in current year */
-    {
-      int8 month = tm->month;
-      while ( --month >= 0 )
-      {
-        days += monthLength( IsLeapYear( tm->year ), month );
-      }
-    }
+		/* Next, complete months in current year */
+		{
+			int8	month = tm->month;
+//			while (--month >= 0) {		// modify by xyz - 2014.10.31
+			while (--month > 0) {
+				days += monthLength(IsLeapYear(tm->year), month);
+			}
+		}
 
-    /* Next, complete years before current year */
-    {
-      uint16 year = tm->year;
-      while ( --year >= BEGYEAR )
-      {
-        days += YearLength( year );
-      }
-    }
+		/* Next, complete years before current year */
+		{
+			uint16	year = tm->year;
+			while (--year >= BEGYEAR) {
+				days += YearLength(year);
+			}
+		}
 
-    /* Add total seconds before partial day */
-    seconds += (days * DAY);
-  }
+		/* Add total seconds before partial day */
+		seconds += (days * DAY);
+	}
 
-  return ( seconds );
+	return (seconds);
 }

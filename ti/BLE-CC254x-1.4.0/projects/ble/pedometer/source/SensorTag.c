@@ -353,7 +353,7 @@ static unsigned char sensorTag_BattMeasure(void)
 	// configure ADC and perform a read
 	HalAdcSetReference(HAL_ADC_REF_125V);
 	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_10);
-	dmsg(("adc=%04x\n", adc));
+//	dmsg(("adc=%04x\n", adc));
 
 	if (adc >= BATT_LEVEL_00) {
 		level = 7;	// battery charge
@@ -1201,21 +1201,8 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	// handle RTC //
 	////////////////
 	if (events & EVT_RTC) {
-		// one second
+		// performed once per second
 
-		{
-			UTCTimeStruct	t;
-			UTCTime		s = 0x1c0f8759;
-
-			osal_setClock(s);
-			dmsg(("(1) s1:%08lx\n", s));
-
-//			sensorTag_ClockGet(&t, 0);
-			osal_ConvertUTCTime(&t, osal_getClock());
-			dmsg(("(2) m:%02x, d:%02x\n", t.month, t.day));
-
-			dmsg(("(3) s2:%08lx\n", osal_ConvertUTCSecs(&t)));
-		}
 
 		switch (pwmgr) {
 		case PWMGR_S0:
