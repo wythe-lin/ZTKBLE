@@ -364,14 +364,14 @@ void halSleep(uint32 osal_timeout)
 
 			// prep CC254x power mode
 			HAL_SLEEP_PREP_POWER_MODE(halPwrMgtMode);
-	
+
 			// save interrupt enable registers and disable all interrupts
 			HAL_SLEEP_IE_BACKUP_AND_DISABLE(ien0, ien1, ien2);
 			HAL_ENABLE_INTERRUPTS();
-	
+
 			// Disable I2C to avoid driving lines
 			HalI2CDisable();
-	
+
 			// Disable  DCDC
 //			DCDC_SBIT = 0;		// modify by xyz for hardware different - 2014.10.30
 
@@ -405,10 +405,10 @@ void halSleep(uint32 osal_timeout)
 			if ((wakeForRF == TRUE) && !(IRCON & 0x80)) {
 				wakeForRF = FALSE;
 			}
-	
+
 			// restore interrupt enable registers
 			HAL_SLEEP_IE_RESTORE(ien0, ien1, ien2);
-	
+
 			// power on the LL; blocks until completion
 			// Note: This is done here to ensure the 32MHz XOSC has stablized, in
 			//       case it is needed (e.g. the ADC is used by the joystick).
@@ -467,25 +467,24 @@ void halSleep(uint32 osal_timeout)
  *
  * @return      None.
  */
-void halSleepSetTimer( uint32 sleepTimer, uint32 timeout )
+void halSleepSetTimer(uint32 sleepTimer, uint32 timeout)
 {
-  HAL_SLEEP_TIMER_DISABLE_INT();
+	HAL_SLEEP_TIMER_DISABLE_INT();
 
-  // compute sleep timer compare value
-  sleepTimer += timeout;
+	// compute sleep timer compare value
+	sleepTimer += timeout;
 
-  // subtract the processing time spent in function halSleep()
-  sleepTimer -= HAL_SLEEP_ADJ_TICKS;
+	// subtract the processing time spent in function halSleep()
+	sleepTimer -= HAL_SLEEP_ADJ_TICKS;
 
-  // set sleep timer compare; ST0 must be written last
-  ST2 = ((uint8 *)&sleepTimer)[UINT32_NDX2];
-  ST1 = ((uint8 *)&sleepTimer)[UINT32_NDX1];
-  ST0 = ((uint8 *)&sleepTimer)[UINT32_NDX0];
+	// set sleep timer compare; ST0 must be written last
+	ST2 = ((uint8 *) &sleepTimer)[UINT32_NDX2];
+	ST1 = ((uint8 *) &sleepTimer)[UINT32_NDX1];
+	ST0 = ((uint8 *) &sleepTimer)[UINT32_NDX0];
 
-  HAL_SLEEP_TIMER_CLEAR_INT();
-  HAL_SLEEP_TIMER_ENABLE_INT();
-
-  return;
+	HAL_SLEEP_TIMER_CLEAR_INT();
+	HAL_SLEEP_TIMER_ENABLE_INT();
+	return;
 }
 
 
@@ -504,18 +503,17 @@ void halSleepSetTimer( uint32 sleepTimer, uint32 timeout )
  *
  * @return      A snapshot of the 24 bit sleep timer.
  */
-uint32 halSleepReadTimer( void )
+uint32 halSleepReadTimer(void)
 {
-  uint32 sleepTimer;
+	uint32 sleepTimer;
 
-  // read the sleep timer
-  // Note: Read of ST0 latches ST1 and ST2.
-  ((uint8 *)&sleepTimer)[UINT32_NDX0] = ST0;
-  ((uint8 *)&sleepTimer)[UINT32_NDX1] = ST1;
-  ((uint8 *)&sleepTimer)[UINT32_NDX2] = ST2;
-  ((uint8 *)&sleepTimer)[UINT32_NDX3] = 0;
-
-  return( sleepTimer );
+	// read the sleep timer
+	// Note: Read of ST0 latches ST1 and ST2.
+	((uint8 *) &sleepTimer)[UINT32_NDX0] = ST0;
+	((uint8 *) &sleepTimer)[UINT32_NDX1] = ST1;
+	((uint8 *) &sleepTimer)[UINT32_NDX2] = ST2;
+	((uint8 *) &sleepTimer)[UINT32_NDX3] = 0;
+	return (sleepTimer);
 }
 
 
@@ -534,9 +532,9 @@ uint32 halSleepReadTimer( void )
  *
  * @return      Number of timer ticks elapsed during sleep.
  */
-uint32 TimerElapsed( void )
+uint32 TimerElapsed(void)
 {
-  return( 0 );
+	return (0);
 }
 
 
@@ -555,11 +553,11 @@ uint32 TimerElapsed( void )
  *
  * @return      None.
  */
-void halRestoreSleepLevel( void )
+void halRestoreSleepLevel(void)
 {
   // Stub
 #ifdef PM_TEST
-  osal_start_timerEx (Hal_TaskID, HAL_SLEEP_TIMER_EVENT, 1000);
+	osal_start_timerEx(Hal_TaskID, HAL_SLEEP_TIMER_EVENT, 1000);
 #endif // PM_TEST
 }
 
@@ -581,19 +579,19 @@ void halRestoreSleepLevel( void )
  */
 HAL_ISR_FUNCTION(halSleepTimerIsr, ST_VECTOR)
 {
-  HAL_ENTER_ISR();
+	HAL_ENTER_ISR();
 
-  HAL_SLEEP_TIMER_CLEAR_INT();
+	HAL_SLEEP_TIMER_CLEAR_INT();
 
 #ifdef HAL_SLEEP_DEBUG_POWER_MODE
-  halSleepInt = TRUE;
+	halSleepInt = TRUE;
 #endif // HAL_SLEEP_DEBUG_POWER_MODE
 
-  CLEAR_SLEEP_MODE();
+	CLEAR_SLEEP_MODE();
 
-  HAL_EXIT_ISR();
+	HAL_EXIT_ISR();
 
-  return;
+	return;
 }
 
 /*******************************************************************************

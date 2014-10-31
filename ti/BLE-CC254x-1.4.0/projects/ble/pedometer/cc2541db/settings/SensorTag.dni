@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=-693965373
+Checksum=1442552340
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -20,15 +20,30 @@ Placement=_ 732 367 1177 649
 Show=1 1
 Sort=4 0
 [struct_types]
-Fmt0=struct sport_info-distance	3	0
+Fmt0=UTCTimeStruct-day	4	0
+Fmt1=UTCTimeStruct-hour	3	0
+Fmt2=UTCTimeStruct-minutes	3	0
+Fmt3=UTCTimeStruct-month	4	0
+Fmt4=UTCTimeStruct-seconds	3	0
+Fmt5=UTCTimeStruct-year	4	0
+Fmt6=struct sport_info-distance	3	0
 [watch_formats]
-Fmt0={W}0:P0DIR	1	0
+Fmt0={W}0:ADCCON1	1	0
+Fmt1={W}0:ADCCON3	1	0
+Fmt2={W}0:APCFG	1	0
+Fmt3={W}0:ATEST	4	0
+Fmt4={W}0:P0DIR	1	0
+Fmt5={W}0:P0INP	1	0
+Fmt6={W}0:P0SEL	1	0
+Fmt7={W}0:TR0	4	0
+Fmt8={W}0:reading	4	0
 [Breakpoints]
 Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
 Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.489.1" 0 0 0 0 "" 0 ""
-Count=2
+Bp2=_ "STD_CODE" "{$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_ClockBLE.c}.234.12" 1 0 0 0 "" 0 ""
+Count=3
 [ChipconEmu]
-Stop timers on halt=1
+Stop timers on halt=0
 Leave target running=1
 [Log file]
 LoggingEnabled=_ 0

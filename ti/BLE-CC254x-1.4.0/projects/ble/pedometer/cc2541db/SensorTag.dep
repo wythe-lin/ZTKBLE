@@ -139,7 +139,7 @@
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_assert.pbi</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_interrupt.pbi</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_gyro.pbi</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_i2c.pbi</file>
@@ -214,7 +214,7 @@
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\gapbondmgr.r51</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\SensorTag_Main.pbi</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\peripheral.r51</file>
-      <file>$PROJ_DIR$\..\source\ptProfile.h</file>
+      <file>$PROJ_DIR$\..\source\ptprofile.h</file>
       <file>$PROJ_DIR$\..\source\devinfoservice-st.c</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\OSAL_Timers.h</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\ble\include\gatt.h</file>
@@ -334,6 +334,10 @@
         </tool>
       </outputs>
       <inputs>
+        <tool>
+          <name>BICOMP</name>
+          <file> 41 70 90 89 122 14 200 210 255 15 84 48 254 199 12 22 13 11 42 98 251 247 215 219 220 83 213 217 211 218 216 128 133 258</file>
+        </tool>
         <tool>
           <name>ICC8051</name>
           <file> 66 67 41 70 90 89 122 14 200 210 255 15 84 48 254 199 12 22 13 11 42 98 251 247 215 219 220 83 213 217 211 218 216 128 133 258</file>
@@ -1794,7 +1798,7 @@
       <file>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.h</file>
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
       <file>$TOOLKIT_DIR$\inc\clib\stdio.h</file>
       <file>$TOOLKIT_DIR$\inc\clib\stdarg.h</file>
       <file>$PROJ_DIR$\..\source\profile.c</file>
@@ -3536,7 +3540,7 @@
       <file>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.h</file>
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
       <file>$TOOLKIT_DIR$\inc\clib\stdio.h</file>
       <file>$TOOLKIT_DIR$\inc\clib\stdarg.h</file>
       <file>$PROJ_DIR$\..\source\custom.h</file>

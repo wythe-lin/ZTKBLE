@@ -107,23 +107,20 @@ static uint8 registeredKeysTaskID = NO_TASK_ID;
  * @param   level: COLD,WARM,READY
  * @return  None
  */
-void InitBoard( uint8 level )
+void InitBoard(uint8 level)
 {
-  if ( level == OB_COLD )
-  {
-    // Interrupts off
-    osal_int_disable( INTS_ALL );
-    // Turn all LEDs off
-    HalLedSet( HAL_LED_ALL, HAL_LED_MODE_OFF );
-    // Check for Brown-Out reset
-//    ChkReset();
-  }
-  else  // !OB_COLD
-  {
-    /* Initialize Key stuff */
-    OnboardKeyIntEnable = HAL_KEY_INTERRUPT_ENABLE;
-    HalKeyConfig( OnboardKeyIntEnable, OnBoard_KeyCallback);
-  }
+	if (level == OB_COLD) {
+		// Interrupts off
+		osal_int_disable( INTS_ALL );
+		// Turn all LEDs off
+		HalLedSet( HAL_LED_ALL, HAL_LED_MODE_OFF );
+		// Check for Brown-Out reset
+//		ChkReset();
+	} else {// !OB_COLD
+		/* Initialize Key stuff */
+		OnboardKeyIntEnable = HAL_KEY_INTERRUPT_ENABLE;
+		HalKeyConfig(OnboardKeyIntEnable, OnBoard_KeyCallback);
+	}
 }
 
 /*********************************************************************
@@ -213,26 +210,24 @@ uint8 RegisterForKeys( uint8 task_id )
  *
  * @return  status
  *********************************************************************/
-uint8 OnBoard_SendKeys( uint8 keys, uint8 state )
+uint8 OnBoard_SendKeys(uint8 keys, uint8 state)
 {
-  keyChange_t *msgPtr;
+	keyChange_t *msgPtr;
 
-  if ( registeredKeysTaskID != NO_TASK_ID )
-  {
-    // Send the address to the task
-    msgPtr = (keyChange_t *)osal_msg_allocate( sizeof(keyChange_t) );
-    if ( msgPtr )
-    {
-      msgPtr->hdr.event = KEY_CHANGE;
-      msgPtr->state = state;
-      msgPtr->keys = keys;
+	if (registeredKeysTaskID != NO_TASK_ID) {
+		// Send the address to the task
+		msgPtr = (keyChange_t *)osal_msg_allocate( sizeof(keyChange_t) );
+		if (msgPtr) {
+			msgPtr->hdr.event = KEY_CHANGE;
+			msgPtr->state = state;
+			msgPtr->keys = keys;
 
-      osal_msg_send( registeredKeysTaskID, (uint8 *)msgPtr );
-    }
-    return ( SUCCESS );
-  }
-  else
-    return ( FAILURE );
+			osal_msg_send(registeredKeysTaskID, (uint8 *) msgPtr);
+		}
+		return (SUCCESS);
+	} else {
+		return (FAILURE);
+	}
 }
 
 /*********************************************************************
@@ -245,63 +240,51 @@ uint8 OnBoard_SendKeys( uint8 keys, uint8 state )
  *
  * @return  void
  *********************************************************************/
-void OnBoard_KeyCallback ( uint8 keys, uint8 state )
+void OnBoard_KeyCallback(uint8 keys, uint8 state)
 {
-  uint8 shift;
-  (void)state;
+	uint8	shift;
+	(void)	state;
 
-  // shift key (S1) is used to generate key interrupt
-  // applications should not use S1 when key interrupt is enabled
-  shift = (OnboardKeyIntEnable == HAL_KEY_INTERRUPT_ENABLE) ? false : ((keys & HAL_KEY_SW_6) ? true : false);
+	// shift key (S1) is used to generate key interrupt
+	// applications should not use S1 when key interrupt is enabled
+	shift = (OnboardKeyIntEnable == HAL_KEY_INTERRUPT_ENABLE) ? false : ((keys & HAL_KEY_SW_6) ? true : false);
 
-  if ( OnBoard_SendKeys( keys, shift ) != SUCCESS )
-  {
-    // Process SW1 here
-    if ( keys & HAL_KEY_SW_1 )  // Switch 1
-    {
-    }
-    // Process SW2 here
-    if ( keys & HAL_KEY_SW_2 )  // Switch 2
-    {
-    }
-    // Process SW3 here
-    if ( keys & HAL_KEY_SW_3 )  // Switch 3
-    {
-    }
-    // Process SW4 here
-    if ( keys & HAL_KEY_SW_4 )  // Switch 4
-    {
-    }
-    // Process SW5 here
-    if ( keys & HAL_KEY_SW_5 )  // Switch 5
-    {
-    }
-    // Process SW6 here
-    if ( keys & HAL_KEY_SW_6 )  // Switch 6
-    {
-    }
-  }
+	if (OnBoard_SendKeys( keys, shift ) != SUCCESS) {
+		// Process SW1 here
+		if (keys & HAL_KEY_SW_1) {	// Switch 1
+		}
+		// Process SW2 here
+		if (keys & HAL_KEY_SW_2) {	// Switch 2
+		}
+		// Process SW3 here
+		if (keys & HAL_KEY_SW_3) {	// Switch 3
+		}
+		// Process SW4 here
+		if (keys & HAL_KEY_SW_4) {	// Switch 4
+		}
+		// Process SW5 here
+		if (keys & HAL_KEY_SW_5) {	// Switch 5
+		}
+		// Process SW6 here
+		if (keys & HAL_KEY_SW_6) {	// Switch 6
+		}
+	}
 
-  /* If any key is currently pressed down and interrupt
-     is still enabled, disable interrupt and switch to polling */
-  if( keys != 0 )
-  {
-    if( OnboardKeyIntEnable == HAL_KEY_INTERRUPT_ENABLE )
-    {
-      OnboardKeyIntEnable = HAL_KEY_INTERRUPT_DISABLE;
-      HalKeyConfig( OnboardKeyIntEnable, OnBoard_KeyCallback);
-    }
-  }
-  /* If no key is currently pressed down and interrupt
-     is disabled, enable interrupt and turn off polling */
-  else
-  {
-    if( OnboardKeyIntEnable == HAL_KEY_INTERRUPT_DISABLE )
-    {
-      OnboardKeyIntEnable = HAL_KEY_INTERRUPT_ENABLE;
-      HalKeyConfig( OnboardKeyIntEnable, OnBoard_KeyCallback);
-    }
-  }
+	/* If any key is currently pressed down and interrupt
+	   is still enabled, disable interrupt and switch to polling */
+	if (keys != 0) {
+		if (OnboardKeyIntEnable == HAL_KEY_INTERRUPT_ENABLE) {
+			OnboardKeyIntEnable = HAL_KEY_INTERRUPT_DISABLE;
+			HalKeyConfig(OnboardKeyIntEnable, OnBoard_KeyCallback);
+		}
+	} else {
+	/* If no key is currently pressed down and interrupt
+	   is disabled, enable interrupt and turn off polling */
+		if (OnboardKeyIntEnable == HAL_KEY_INTERRUPT_DISABLE) {
+			OnboardKeyIntEnable = HAL_KEY_INTERRUPT_ENABLE;
+			HalKeyConfig(OnboardKeyIntEnable, OnBoard_KeyCallback);
+		}
+	}
 }
 
 /*********************************************************************
@@ -314,10 +297,10 @@ void OnBoard_KeyCallback ( uint8 keys, uint8 state )
  * @return  none
  *
  *********************************************************************/
-__near_func void Onboard_soft_reset( void )
+__near_func void Onboard_soft_reset(void)
 {
-  HAL_DISABLE_INTERRUPTS();
-  asm("LJMP 0x0");
+	HAL_DISABLE_INTERRUPTS();
+	asm("LJMP 0x0");
 }
 
 #if   defined FEATURE_ABL

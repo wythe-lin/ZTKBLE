@@ -281,10 +281,9 @@
 	MOTOR_DDR   |=  MOTOR_BV;	/* output */				\
 										\
 	/* battery detect pin */						\
+	BATT_SEL    |=  BATT_BV;	/* peripheral function */		\
 	BATT_INP    |=  BATT_BV;	/* input mode 3-state */		\
 	BATT_DDR    &= ~BATT_BV;	/* input mode */			\
-	BATT_ACG    |=  BATT_BV;	/* analog I/O enabled */		\
-	BATT_SEL    |=  BATT_BV;	/* peripheral function */		\
 }
 
 

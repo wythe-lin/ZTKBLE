@@ -113,10 +113,10 @@ reliably.
 /**************************************************************************************************
 *                                        GLOBAL VARIABLES
 **************************************************************************************************/
-static uint8 halKeySavedKeys;     /* used to store previous key state in polling mode */
-static halKeyCBack_t pHalKeyProcessFunction;
-static uint8 HalKeyConfigured;
-bool Hal_KeyIntEnable;            /* interrupt enable/disable flag */
+static uint8		halKeySavedKeys;	/* used to store previous key state in polling mode */
+static halKeyCBack_t	pHalKeyProcessFunction;
+static uint8		HalKeyConfigured;
+bool			Hal_KeyIntEnable;	/* interrupt enable/disable flag */
 
 /**************************************************************************************************
 *                                        FUNCTIONS - Local
@@ -138,26 +138,26 @@ bool Hal_KeyIntEnable;            /* interrupt enable/disable flag */
 *
 * @return  None
 **************************************************************************************************/
-void HalKeyInit( void )
+void HalKeyInit(void)
 {
-  /* Initialize previous key to 0 */
-  halKeySavedKeys = 0;
+	/* Initialize previous key to 0 */
+	halKeySavedKeys = 0;
 
-  HAL_KEY_SW_1_SEL &= ~(HAL_KEY_SW_1_BIT);    /* Set pin function to GPIO */
-  HAL_KEY_SW_1_DIR &= ~(HAL_KEY_SW_1_BIT);    /* Set pin direction to Input */
+	HAL_KEY_SW_1_SEL &= ~(HAL_KEY_SW_1_BIT);	/* Set pin function to GPIO */
+	HAL_KEY_SW_1_DIR &= ~(HAL_KEY_SW_1_BIT);	/* Set pin direction to Input */
 
-  HAL_KEY_SW_2_SEL &= ~(HAL_KEY_SW_2_BIT);    /* Set pin function to GPIO */
-  HAL_KEY_SW_2_DIR &= ~(HAL_KEY_SW_2_BIT);    /* Set pin direction to Input */
+	HAL_KEY_SW_2_SEL &= ~(HAL_KEY_SW_2_BIT);	/* Set pin function to GPIO */
+	HAL_KEY_SW_2_DIR &= ~(HAL_KEY_SW_2_BIT);	/* Set pin direction to Input */
 
-  HAL_KEY_SW_3_SEL &= ~(HAL_KEY_SW_3_BIT);    /* Set pin function to GPIO */
-  HAL_KEY_SW_3_DIR &= ~(HAL_KEY_SW_3_BIT);    /* Set pin direction to Input */
+	HAL_KEY_SW_3_SEL &= ~(HAL_KEY_SW_3_BIT);	/* Set pin function to GPIO */
+	HAL_KEY_SW_3_DIR &= ~(HAL_KEY_SW_3_BIT);	/* Set pin direction to Input */
 
 
-  /* Initialize callback function */
-  pHalKeyProcessFunction  = NULL;
+	/* Initialize callback function */
+	pHalKeyProcessFunction  = NULL;
 
-  /* Start with key is not configured */
-  HalKeyConfigured = FALSE;
+	/* Start with key is not configured */
+	HalKeyConfigured = FALSE;
 }
 
 
@@ -171,54 +171,50 @@ void HalKeyInit( void )
 *
 * @return  None
 **************************************************************************************************/
-void HalKeyConfig (bool interruptEnable, halKeyCBack_t cback)
+void HalKeyConfig(bool interruptEnable, halKeyCBack_t cback)
 {
-  /* Enable/Disable Interrupt or */
-  Hal_KeyIntEnable = interruptEnable;
+	/* Enable/Disable Interrupt or */
+	Hal_KeyIntEnable = interruptEnable;
 
-  /* Register the callback fucntion */
-  pHalKeyProcessFunction = cback;
+	/* Register the callback fucntion */
+	pHalKeyProcessFunction = cback;
 
-  /* Determine if interrupt is enable or not */
-  if (Hal_KeyIntEnable)
-  {
-    /* Rising/Falling edge configuratinn */
-    PICTL |= (HAL_KEY_SW_1_EDGEBIT | HAL_KEY_SW_2_3_EDGEBIT);   /* Set the edge bit to set falling edge to give int */
+	/* Determine if interrupt is enable or not */
+	if (Hal_KeyIntEnable) {
+		/* Rising/Falling edge configuratinn */
+		PICTL |= (HAL_KEY_SW_1_EDGEBIT | HAL_KEY_SW_2_3_EDGEBIT);   /* Set the edge bit to set falling edge to give int */
 
-    HAL_KEY_SW_1_ICTL |= HAL_KEY_SW_1_ICTLBIT; /* enable interrupt generation at port */
-    HAL_KEY_SW_1_IEN |= HAL_KEY_SW_1_IENBIT;   /* enable CPU interrupt */
-    HAL_KEY_SW_1_PXIFG = ~(HAL_KEY_SW_1_BIT);  /* Clear any pending interrupt */
+		HAL_KEY_SW_1_ICTL |= HAL_KEY_SW_1_ICTLBIT;		/* enable interrupt generation at port */
+		HAL_KEY_SW_1_IEN  |= HAL_KEY_SW_1_IENBIT;		/* enable CPU interrupt */
+		HAL_KEY_SW_1_PXIFG = ~(HAL_KEY_SW_1_BIT);		/* Clear any pending interrupt */
 
-    HAL_KEY_SW_2_ICTL |= HAL_KEY_SW_2_ICTLBIT; /* enable interrupt generation at port */
-    HAL_KEY_SW_2_IEN |= HAL_KEY_SW_2_IENBIT;   /* enable CPU interrupt */
-    HAL_KEY_SW_2_PXIFG = ~(HAL_KEY_SW_2_BIT);  /* Clear any pending interrupt */
+		HAL_KEY_SW_2_ICTL |= HAL_KEY_SW_2_ICTLBIT;		/* enable interrupt generation at port */
+		HAL_KEY_SW_2_IEN  |= HAL_KEY_SW_2_IENBIT;		/* enable CPU interrupt */
+		HAL_KEY_SW_2_PXIFG = ~(HAL_KEY_SW_2_BIT);		/* Clear any pending interrupt */
 
-    HAL_KEY_SW_3_ICTL |= HAL_KEY_SW_3_ICTLBIT; /* enable interrupt generation at port */
-    HAL_KEY_SW_3_IEN |= HAL_KEY_SW_3_IENBIT;   /* enable CPU interrupt */
-    HAL_KEY_SW_3_PXIFG = (uint8)(~(HAL_KEY_SW_3_BIT));  /* Clear any pending interrupt */
+		HAL_KEY_SW_3_ICTL |= HAL_KEY_SW_3_ICTLBIT;		/* enable interrupt generation at port */
+		HAL_KEY_SW_3_IEN  |= HAL_KEY_SW_3_IENBIT;		/* enable CPU interrupt */
+		HAL_KEY_SW_3_PXIFG = (uint8)(~(HAL_KEY_SW_3_BIT));	/* Clear any pending interrupt */
 
-    /* Do this only after the hal_key is configured - to work with sleep stuff */
-    if (HalKeyConfigured == TRUE)
-    {
-      osal_stop_timerEx(Hal_TaskID, HAL_KEY_EVENT);  /* Cancel polling if active */
-    }
-  }
-  else    /* Interrupts NOT enabled */
-  {
-    HAL_KEY_SW_1_ICTL &= ~(HAL_KEY_SW_1_ICTLBIT); /* don't generate interrupt */
-    HAL_KEY_SW_1_IEN &= ~(HAL_KEY_SW_1_IENBIT);   /* Clear interrupt enable bit */
+		/* Do this only after the hal_key is configured - to work with sleep stuff */
+		if (HalKeyConfigured == TRUE) {
+			osal_stop_timerEx(Hal_TaskID, HAL_KEY_EVENT);	/* Cancel polling if active */
+		}
+	} else { /* Interrupts NOT enabled */
+		HAL_KEY_SW_1_ICTL &= ~(HAL_KEY_SW_1_ICTLBIT);		/* don't generate interrupt */
+		HAL_KEY_SW_1_IEN  &= ~(HAL_KEY_SW_1_IENBIT);		/* Clear interrupt enable bit */
 
-    HAL_KEY_SW_2_ICTL &= ~(HAL_KEY_SW_2_ICTLBIT); /* don't generate interrupt */
-    HAL_KEY_SW_2_IEN &= ~(HAL_KEY_SW_2_IENBIT);   /* Clear interrupt enable bit */
+		HAL_KEY_SW_2_ICTL &= ~(HAL_KEY_SW_2_ICTLBIT);		/* don't generate interrupt */
+		HAL_KEY_SW_2_IEN  &= ~(HAL_KEY_SW_2_IENBIT);		/* Clear interrupt enable bit */
 
-    HAL_KEY_SW_3_ICTL &= ~(HAL_KEY_SW_3_ICTLBIT); /* don't generate interrupt */
-    HAL_KEY_SW_3_IEN &= ~(HAL_KEY_SW_3_IENBIT);   /* Clear interrupt enable bit */
+		HAL_KEY_SW_3_ICTL &= ~(HAL_KEY_SW_3_ICTLBIT);		/* don't generate interrupt */
+		HAL_KEY_SW_3_IEN  &= ~(HAL_KEY_SW_3_IENBIT);		/* Clear interrupt enable bit */
 
-    osal_set_event(Hal_TaskID, HAL_KEY_EVENT);
-  }
+		osal_set_event(Hal_TaskID, HAL_KEY_EVENT);
+	}
 
-  /* Key now is configured */
-  HalKeyConfigured = TRUE;
+	/* Key now is configured */
+	HalKeyConfigured = TRUE;
 }
 
 
@@ -257,59 +253,47 @@ uint8 HalKeyRead(void)
 *
 * @return  None
 **************************************************************************************************/
-void HalKeyPoll (void)
+void HalKeyPoll(void)
 {
-  uint8 keys = 0;
-  uint8 notify = 0;
+	uint8	keys = 0;
+	uint8	notify = 0;
 
-  if (!(HAL_KEY_SW_1_PORT & HAL_KEY_SW_1_BIT))    /* Key is active low */
-  {
-    keys |= HAL_KEY_SW_1;
-  }
-  if (!(HAL_KEY_SW_2_PORT & HAL_KEY_SW_2_BIT))    /* Key is active low */
-  {
-    keys |= HAL_KEY_SW_2;
-  }
-  if (!(HAL_KEY_SW_3_PORT & HAL_KEY_SW_3_BIT))    /* Key is active low */
-  {
-    keys |= HAL_KEY_SW_3;
-  }
+	if (!(HAL_KEY_SW_1_PORT & HAL_KEY_SW_1_BIT)) {	/* Key is active low */
+		keys |= HAL_KEY_SW_1;
+	}
+	if (!(HAL_KEY_SW_2_PORT & HAL_KEY_SW_2_BIT)) {	/* Key is active low */
+		keys |= HAL_KEY_SW_2;
+	}
+	if (!(HAL_KEY_SW_3_PORT & HAL_KEY_SW_3_BIT)) {	/* Key is active low */
+		keys |= HAL_KEY_SW_3;
+	}
 
-  (void) keys;
+	(void) keys;
 
-  /* If interrupts are not enabled, previous key status and current key status
-  * are compared to find out if a key has changed status.
-  */
-  if (!Hal_KeyIntEnable)
-  {
-    if (keys == halKeySavedKeys)
-    {
-      /* Exit - since no keys have changed */
-      return;
-    }
-    else
-    {
-      notify = 1;
-    }
-  }
-  else
-  {
-    /* Key interrupt handled here */
-    if (keys)
-    {
-      notify = 1;
-    }
-  }
+	/* If interrupts are not enabled, previous key status and current key status
+	* are compared to find out if a key has changed status.
+	*/
+	if (!Hal_KeyIntEnable) {
+		if (keys == halKeySavedKeys) {
+			/* Exit - since no keys have changed */
+			return;
+		} else {
+			notify = 1;
+		}
+	} else {
+		/* Key interrupt handled here */
+		if (keys) {
+			notify = 1;
+		}
+	}
 
-  /* Store the current keys for comparation next time */
-  halKeySavedKeys = keys;
+	/* Store the current keys for comparation next time */
+	halKeySavedKeys = keys;
 
-  /* Invoke Callback if new keys were depressed */
-  if (notify && (pHalKeyProcessFunction))
-  {
-    (pHalKeyProcessFunction) (keys, HAL_KEY_STATE_NORMAL);
-
-  }
+	/* Invoke Callback if new keys were depressed */
+	if (notify && (pHalKeyProcessFunction)) {
+		(pHalKeyProcessFunction)(keys, HAL_KEY_STATE_NORMAL);
+	}
 }
 
 /**************************************************************************************************
@@ -354,7 +338,7 @@ void halProcessKeyInterrupt(void)
 *
 * @return
 **************************************************************************************************/
-void HalKeyEnterSleep ( void )
+void HalKeyEnterSleep(void)
 {
 	custom_enter_sleep();
 }
@@ -368,7 +352,7 @@ void HalKeyEnterSleep ( void )
 *
 * @return  - return saved keys
 **************************************************************************************************/
-uint8 HalKeyExitSleep ( void )
+uint8 HalKeyExitSleep(void)
 {
 	custom_exit_sleep();
 
@@ -378,11 +362,10 @@ uint8 HalKeyExitSleep ( void )
 
 #else
 
-
-void HalKeyInit(void){}
-void HalKeyConfig(bool interruptEnable, halKeyCBack_t cback){}
-uint8 HalKeyRead(void){ return 0;}
-void HalKeyPoll(void){}
+void HalKeyInit(void) {}
+void HalKeyConfig(bool interruptEnable, halKeyCBack_t cback) {}
+uint8 HalKeyRead(void) { return 0;}
+void HalKeyPoll(void) {}
 
 #endif /* HAL_KEY */
 

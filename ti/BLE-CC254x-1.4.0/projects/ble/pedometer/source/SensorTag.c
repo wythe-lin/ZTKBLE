@@ -115,6 +115,9 @@
 // What is the advertising interval when device is discoverable (units of 625us, 160=100ms)
 #define DEFAULT_ADVERTISING_INTERVAL		(160*5)
 
+// Maximum time to remain advertising, when in Limited Discoverable mode. In seconds (default 180 seconds)
+#define DEFAULT_ADVERT_MAX_TIMEOUT		(30)
+
 // General discoverable mode advertises indefinitely
 #define DEFAULT_DISCOVERABLE_MODE		GAP_ADTYPE_FLAGS_LIMITED
 
@@ -128,7 +131,7 @@
 
 // Slave latency to use if automatic parameter update request is enabled
 // iOS request slave latency < 4s
-#define DEFAULT_DESIRED_SLAVE_LATENCY		(0)
+#define DEFAULT_DESIRED_SLAVE_LATENCY		(1)
 
 // Supervision timeout value (units of 10ms, 1000=10s) if automatic parameter update request is enabled
 // Supervision Timeout > (1 + Slave Latency) * (Connection Interval)
@@ -349,7 +352,7 @@ static unsigned char sensorTag_BattMeasure(void)
 
 	// configure ADC and perform a read
 	HalAdcSetReference(HAL_ADC_REF_125V);
-	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_14);
+	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_10);
 	dmsg(("adc=%04x\n", adc));
 
 	if (adc >= BATT_LEVEL_00) {
@@ -372,39 +375,6 @@ static unsigned char sensorTag_BattMeasure(void)
 	return level;
 }
 
-static void sensorTag_BattDisp(unsigned char level)
-{
-	vgm064032a1w01_set_font(&icon16x16);
-	switch (level) {
-	case 7:	// battery charge
-		switch (charge_icon) {
-		case 0:	vgm064032a1w01_draw_icon(2, 44,  7);	break;
-		case 1:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
-		case 2:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
-		case 3:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
-		case 4:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
-		case 5:	vgm064032a1w01_draw_icon(2, 44, 12);	break;
-		}
-		if (charge_cnt < 3) {
-			charge_cnt++;
-		} else {
-			charge_cnt = 0;
-			if (++charge_icon > 5) {
-				charge_icon = 0;
-			}
-		}
-		break;
-
-	case 6:	vgm064032a1w01_draw_icon(2, 44, 12);	break;	// battery full
-	case 5:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
-	case 4:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
-	case 3:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
-	case 2:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
-	case 1:	vgm064032a1w01_draw_icon(2, 44,  7);	break;	// battery empty
-	case 0:	vgm064032a1w01_draw_icon(2, 44, 13);	break;	// battery shutdown
-	}
-}
-
 
 /**
  * @fn      sensorTag_HandleKeys
@@ -421,16 +391,15 @@ static void sensorTag_BattDisp(unsigned char level)
 static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 {
 	VOID	shift;		// Intentionally unreferenced parameter
-	uint8	SK_Keys = 0;
 	uint8	current_adv_status;
 
 	if (keys & HAL_KEY_SW_1) {
 		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
-		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
+//		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
 
 		// find the current GAP advertising status
 		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
-		if (current_adv_status == FALSE) {
+		if ((current_adv_status == FALSE) && (gapProfileState != GAPROLE_CONNECTED)) {
 			current_adv_status = TRUE;
 			GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
 		}
@@ -442,7 +411,6 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 
 		// power management
 		power_saving = PERIOD_SCREEN_SAVING;
-//		osal_start_timerEx(sensorTag_TaskID, EVT_PWMGR,		PERIOD_PWMGR);
 
 		// press KEY1
 		key1_press = TRUE;
@@ -480,25 +448,12 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 			}
 		}
 
-		if (pwmgr != PWMGR_S0) {
-			dmsg(("S0 (full run)\n"));
-		}
 		pwmgr = PWMGR_S0;
 	} else {
 		// release KEY1
 		key1_press = FALSE;
 
 	}
-
-
-	if (keys & HAL_KEY_SW_2) {
-		SK_Keys |= SK_KEY_LEFT;
-	}
-
-	if (keys & HAL_KEY_SW_3) {
-		SK_Keys |= SK_KEY_RIGHT;
-	}
-
 }
 
 
@@ -524,6 +479,48 @@ static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *pMsg)
 	}
 }
 
+
+/**
+ * @fn      sensorTag_BattDisp
+ *
+ * @brief
+ *
+ * @param
+ *
+ * @return
+ */
+static void sensorTag_BattDisp(unsigned char level)
+{
+	vgm064032a1w01_set_font(&icon16x16);
+	switch (level) {
+	case 7:	// battery charge
+		switch (charge_icon) {
+		case 0:	vgm064032a1w01_draw_icon(2, 44,  7);	break;
+		case 1:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
+		case 2:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
+		case 3:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
+		case 4:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
+		case 5:	vgm064032a1w01_draw_icon(2, 44, 12);	break;
+		}
+		if (charge_cnt < 3) {
+			charge_cnt++;
+		} else {
+			charge_cnt = 0;
+			if (++charge_icon > 5) {
+				charge_icon = 0;
+			}
+		}
+		break;
+
+	case 6:	vgm064032a1w01_draw_icon(2, 44, 12);	break;	// battery full
+	case 5:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
+	case 4:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
+	case 3:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
+	case 2:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
+	case 1:	vgm064032a1w01_draw_icon(2, 44,  7);	break;	// battery empty
+	case 0:	vgm064032a1w01_draw_icon(2, 44, 13);	break;	// battery shutdown
+	}
+}
 
 /**
  * @fn      sensorTag_HandleDisp
@@ -732,7 +729,6 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
 		dmsg(("\033[1;34m{connected adv.}\033[0m\n"));
 		break;
 
-
 	case GAPROLE_WAITING_AFTER_TIMEOUT:
 		dmsg(("\033[1;34m{timeout}\033[0m\n"));
 		break;
@@ -802,7 +798,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 		chksum_recv = pkt->req.get_ssdcg_by_week.chksum;
 		if (chksum_recv == chksum_calc) {
 #if 1
-			sensorTag_ClockGet(&time, 0);
+//			sensorTag_ClockGet(&time, 0);
 
 			pkt->rsp.get_week_ssdcg_ok.id      = GET_WEEK_SSDCG_OK_RSP;
 			pkt->rsp.get_week_ssdcg_ok.len     = 0xb4;
@@ -879,6 +875,10 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			pkt->rsp.get_dev_time_ok.second	= time.seconds;
 			pkt->rsp.get_dev_time_ok.week	= normal.week;
 			pkt->rsp.get_dev_time_ok.chksum	= ptProfile_CalcChksum(pkt->header.len, pkt->header.ptr);
+
+			dmsg(("(%02x, %02x)\n", pkt->rsp.get_dev_time_ok.month, time.month));
+			dmsg(("(%02x, %02x)\n", pkt->rsp.get_dev_time_ok.day, time.day));
+
 		} else {
 			pkt->rsp.get_dev_time_ng.id	= GET_DEV_TIME_NG_RSP;
 			pkt->rsp.get_dev_time_ng.len	= 0;
@@ -1016,11 +1016,14 @@ void SensorTag_Init(uint8 task_id)
 	// Set advertising interval
 	{
 		uint16	advInt = DEFAULT_ADVERTISING_INTERVAL;
+		uint16	advTO  = DEFAULT_ADVERT_MAX_TIMEOUT;
 
 		GAP_SetParamValue(TGAP_LIM_DISC_ADV_INT_MIN, advInt);
 		GAP_SetParamValue(TGAP_LIM_DISC_ADV_INT_MAX, advInt);
 		GAP_SetParamValue(TGAP_GEN_DISC_ADV_INT_MIN, advInt);
 		GAP_SetParamValue(TGAP_GEN_DISC_ADV_INT_MAX, advInt);
+
+		GAP_SetParamValue(TGAP_LIM_ADV_TIMEOUT,      advTO);
 	}
 
 	// Setup the GAP Bond Manager
@@ -1118,7 +1121,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	// start device event //
 	////////////////////////
 	if (events & EVT_START_DEVICE) {
-		dmsg(("\033[40;35mS0 (power on)\033[0m\n"));
+		dmsg(("\033[40;35m\n\nS0 (power on)\033[0m\n"));
 
 		// start the device
 		GAPRole_StartDevice(&sensorTag_PeripheralCBs);
@@ -1199,12 +1202,33 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	////////////////
 	if (events & EVT_RTC) {
 		// one second
+
+		{
+			UTCTimeStruct	t;
+			UTCTime		s = 0x1c0f8759;
+
+			osal_setClock(s);
+			dmsg(("(1) s1:%08lx\n", s));
+
+//			sensorTag_ClockGet(&t, 0);
+			osal_ConvertUTCTime(&t, osal_getClock());
+			dmsg(("(2) m:%02x, d:%02x\n", t.month, t.day));
+
+			dmsg(("(3) s2:%08lx\n", osal_ConvertUTCSecs(&t)));
+		}
+
 		switch (pwmgr) {
 		case PWMGR_S0:
 			if (power_saving--) {
 				if (!power_saving) {
 					dmsg(("\033[40;35mS1 (screen saving)\033[0m\n"));
 					vgm064032a1w01_enter_sleep();
+					osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+
+					osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
+					osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
+					osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
+
 					power_saving = 5;
 					pwmgr        = PWMGR_S1;
 				}
@@ -1214,12 +1238,8 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		case PWMGR_S1:
 			if (power_saving--) {
 				if (!power_saving) {
-					dmsg(("\033[40;35mS2 (g-sensor only)\033[0m\n"));
-					osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
-					osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
-					osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
+					dmsg(("\033[40;35mS2 (g-sensor + RTC)\033[0m\n"));
 
-					osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
 					osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
 					power_saving = 1;
 					pwmgr        = PWMGR_S2;
@@ -1228,22 +1248,22 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 			break;
 
 		case PWMGR_S2:
-			if (power_saving--) {
-				if (!power_saving) {
-					pwmgr        = PWMGR_S2;
-
-				}
-			}
+//			dmsg(("\033[40;35mS3 ()\033[0m\n"));
+//			pwmgr = PWMGR_S3;
+			dmsg(("$"));
 			break;
 
 		case PWMGR_S3:
+			dmsg(("%"));
 			break;
 
 		default:
 			break;
 		}
 
-		osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+		if (pwmgr != PWMGR_S3) {
+			osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+		}
 		return (events ^ EVT_RTC);
 	}
 
