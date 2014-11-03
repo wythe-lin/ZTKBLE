@@ -113,7 +113,7 @@
  *****************************************************************************
  */
 // What is the advertising interval when device is discoverable (units of 625us, 160=100ms)
-#define DEFAULT_ADVERTISING_INTERVAL		(160*5)
+#define DEFAULT_ADVERTISING_INTERVAL		(160*2)
 
 // Maximum time to remain advertising, when in Limited Discoverable mode. In seconds (default 180 seconds)
 #define DEFAULT_ADVERT_MAX_TIMEOUT		(30)
@@ -145,13 +145,12 @@
 
 
 // battery level
-#define BATT_LEVEL_00				500		// 464	// 4.0V 1858
-#define BATT_LEVEL_01				455		// 3.4V 1857
-#define BATT_LEVEL_02				443		// 3.2V 1737
-#define BATT_LEVEL_03				428		// 3.1V
-#define BATT_LEVEL_04				414		// 3.0V
-#define BATT_LEVEL_05				394		// 2.9V
-#define BATT_LEVEL_06				382		// 2.8V
+#define BATT_LEVEL_01				(7077)		// 3.7V - 0x1ba5
+#define BATT_LEVEL_02				(6912)		// 3.6V
+#define BATT_LEVEL_03				(6657)		// 3.5V
+#define BATT_LEVEL_04				(6473)		// 3.4V
+#define BATT_LEVEL_05				(6236)		// 3.3V
+#define BATT_LEVEL_06				(5867)		// 3.1V - 0x16eb
 
 // how often to perform something (milliseconds)
 #define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
@@ -304,30 +303,9 @@ static struct sport_info	workout = {
  *
  * @return  none
  */
-static void sensorTag_ClockSet(unsigned char *p)
+static void sensorTag_ClockSet(UTCTimeStruct *tm)
 {
-	UTCTimeStruct	time;
-
-	// parse time service structure to OSAL time structure
-	time.year = BUILD_UINT16(p[0], p[1]);
-	if (time.year == 0) {
-		time.year = 2000;
-	}
-	p         += 2;
-	time.month = *p++;
-	if (time.month > 0) {
-//		time.month--;
-	}
-	time.day = *p++;
-	if (time.day > 0) {
-//		time.day--;
-	}
-	time.hour    = *p++;
-	time.minutes = *p++;
-	time.seconds = *p;
-
-	// update OSAL time
-	osal_setClock(osal_ConvertUTCSecs(&time));
+	osal_setClock(osal_ConvertUTCSecs(tm));
 }
 
 static void sensorTag_ClockGet(UTCTimeStruct *t, UTCTime delta)
@@ -352,12 +330,12 @@ static unsigned char sensorTag_BattMeasure(void)
 
 	// configure ADC and perform a read
 	HalAdcSetReference(HAL_ADC_REF_125V);
-	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_10);
+	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_14);
 //	dmsg(("adc=%04x\n", adc));
 
-	if (adc >= BATT_LEVEL_00) {
+	if (!BATCD_SBIT) {
 		level = 7;	// battery charge
-	} else if ((adc >= BATT_LEVEL_01) && (adc < BATT_LEVEL_00)) {
+	} else if ((adc >= BATT_LEVEL_01)) {
 		level = 6;	// battery full
 	} else if ((adc >= BATT_LEVEL_02) && (adc < BATT_LEVEL_01)) {
 		level = 5;
@@ -418,7 +396,7 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 		osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
 		osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
 
-		if (pwmgr == PWMGR_S0) {
+		if (pwmgr == PWMGR_S1) {
 			switch (opmode & 0xF0) {
 			case MODE_NORMAL:
 				opmode++;
@@ -448,7 +426,12 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 			}
 		}
 
-		pwmgr = PWMGR_S0;
+#if DBG_MSG
+		if (pwmgr != PWMGR_S1) {
+			dmsg(("\033[40;35m\nS1 (full run)\033[0m\n"));
+		}
+#endif
+		pwmgr = PWMGR_S1;
 	} else {
 		// release KEY1
 		key1_press = FALSE;
@@ -843,7 +826,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			time.year    = (unsigned short) pkt->req.set_dev_time.year + 2000;
 
 			normal.week  = pkt->req.set_dev_time.week;
-			osal_setClock(osal_ConvertUTCSecs(&time));
+			sensorTag_ClockSet(&time);
 
 			pkt->rsp.set_dev_time_ok.id	= SET_DEV_TIME_OK_RSP;
 			pkt->rsp.set_dev_time_ok.len	= 0x04;
@@ -1063,6 +1046,7 @@ void SensorTag_Init(uint8 task_id)
 
 	// Initialise UART
 	uart_init();
+	BATCD_SEL &= ~BATCD_BV;		// for battery charge detect pin by UART switch to peripheral function
 
 	// Initialise sensor drivers
 //	kxti9_init();
@@ -1093,10 +1077,27 @@ void SensorTag_Init(uint8 task_id)
  *
  * @return  events not processed
  */
+typedef union {
+	uint32	time32;
+	uint16	time16[2];
+	uint8	time8[4];
+} osalTime_t;
+
+typedef struct {
+	void		*next;
+	osalTime_t	timeout;
+	uint16		event_flag;
+	uint8		task_id;
+	uint32		reloadTimeout;
+} osalTimerRec_t;
+
+extern osalTimerRec_t	*timerHead;
+
+
+
 uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 {
 	VOID	task_id;	// OSAL required parameter that isn't used in this function
-	uint8	current_adv_status;
 
 
 	/////////////////////////
@@ -1121,8 +1122,6 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	// start device event //
 	////////////////////////
 	if (events & EVT_START_DEVICE) {
-		dmsg(("\033[40;35m\n\nS0 (power on)\033[0m\n"));
-
 		// start the device
 		GAPRole_StartDevice(&sensorTag_PeripheralCBs);
 
@@ -1134,12 +1133,12 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		adxl345_init();
 		adxl345_self_calibration();
 
-		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
 //		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
-		osal_set_event(sensorTag_TaskID, EVT_RTC);
+		osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 
-		power_saving = 1;
+		dmsg(("\033[40;35m\nS0 (power on)\033[0m\n"));
 		pwmgr        = PWMGR_S0;
+		power_saving = 1;
 		return (events ^ EVT_START_DEVICE);
 	}
 
@@ -1192,7 +1191,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	/////////////
 	if (events & EVT_DISP) {
 		sensorTag_HandleDisp(opmode, acc);
-		osal_start_timerEx(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
+		osal_start_reload_timer(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
 		return (events ^ EVT_DISP);
 	}
 
@@ -1203,21 +1202,12 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_RTC) {
 		// performed once per second
 
-
 		switch (pwmgr) {
 		case PWMGR_S0:
 			if (power_saving--) {
 				if (!power_saving) {
-					dmsg(("\033[40;35mS1 (screen saving)\033[0m\n"));
-					vgm064032a1w01_enter_sleep();
-					osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
-
-					osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
-					osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
-					osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
-
-					power_saving = 5;
-					pwmgr        = PWMGR_S1;
+					osal_pwrmgr_device(PWRMGR_BATTERY);
+					pwmgr = PWMGR_S3;
 				}
 			}
 			break;
@@ -1225,22 +1215,34 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		case PWMGR_S1:
 			if (power_saving--) {
 				if (!power_saving) {
-					dmsg(("\033[40;35mS2 (g-sensor + RTC)\033[0m\n"));
+					dmsg(("\033[40;35mS2 (OLED off)\033[0m\n"));
+					vgm064032a1w01_enter_sleep();
+					osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
 
 					osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
-					power_saving = 1;
-					pwmgr        = PWMGR_S2;
+					pwmgr = PWMGR_S2;
 				}
 			}
 			break;
 
 		case PWMGR_S2:
-//			dmsg(("\033[40;35mS3 ()\033[0m\n"));
-//			pwmgr = PWMGR_S3;
-			dmsg(("$"));
+			if (gapProfileState == GAPROLE_WAITING) {
+					dmsg(("\033[40;35mS3 (BLE off)\033[0m\n"));
+
+					// enable key interrupt mode
+					InitBoard(OB_READY);
+
+					pwmgr = PWMGR_S3;
+			}
 			break;
 
 		case PWMGR_S3:
+//			dmsg(("\033[40;35mS3 ()\033[0m\n"));
+//			pwmgr = PWMGR_S4;
+			dmsg(("$%02x", osal_timer_num_active()));
+			break;
+
+		case PWMGR_S4:
 			dmsg(("%"));
 			break;
 
@@ -1248,43 +1250,10 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 			break;
 		}
 
-		if (pwmgr != PWMGR_S3) {
-			osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+		if (pwmgr != PWMGR_S4) {
+			osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 		}
 		return (events ^ EVT_RTC);
-	}
-
-
-	/////////////////////////////
-	// handle power management //
-	/////////////////////////////
-	if (events & EVT_PWMGR) {
-		// GAP
-		if (gapProfileState == GAPROLE_ADVERTISING) {
-			GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
-			if (current_adv_status == TRUE) {
-				current_adv_status = FALSE;
-				GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
-			}
-		}
-
-		//
-		if (sensorTag_BattMeasure()) {
-			dmsg(("S2 (g-sensor only)\n"));
-			pwmgr = PWMGR_S2;
-		} else {
-			dmsg(("S3 (CPU halt)\n"));
-			pwmgr = PWMGR_S3;
-			osal_stop_timerEx(sensorTag_TaskID, EVT_GSENSOR);
-		}
-
-		osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
-		osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
-		osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
-
-		osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
-		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
-		return (events ^ EVT_PWMGR);
 	}
 
 

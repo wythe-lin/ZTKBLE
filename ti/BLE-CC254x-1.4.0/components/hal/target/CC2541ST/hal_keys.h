@@ -59,73 +59,73 @@ extern "C"
  **************************************************************************************************/
 
 /* Interrupt option - Enable or disable */
-#define HAL_KEY_INTERRUPT_DISABLE    0x00
-#define HAL_KEY_INTERRUPT_ENABLE     0x01
+#define HAL_KEY_INTERRUPT_DISABLE	0x00
+#define HAL_KEY_INTERRUPT_ENABLE	0x01
 
 /* Key state - shift or nornal */
-#define HAL_KEY_STATE_NORMAL          0x00
-#define HAL_KEY_STATE_SHIFT           0x01
+#define HAL_KEY_STATE_NORMAL		0x00
+#define HAL_KEY_STATE_SHIFT		0x01
 
 /* Switches (keys) */
-#define HAL_KEY_SW_1          0x01  // S1 Side Button
-#define HAL_KEY_SW_2          0x02  // S2 Carbon button
-#define HAL_KEY_SW_3          0x04  // S3 Carbon button
+#define HAL_KEY_SW_1			0x01	// S1 Side Button
+#define HAL_KEY_SW_2			0x02	// S2 Carbon button
+#define HAL_KEY_SW_3			0x04	// S3 Carbon button
 
-#define HAL_KEY_DEBOUNCE_VALUE  25
+#define HAL_KEY_DEBOUNCE_VALUE		25
 
 /* CPU port interrupt */
-#define HAL_KEY_CPU_PORT_0_IF P0IF
-#define HAL_KEY_CPU_PORT_2_IF P2IF
+#define HAL_KEY_CPU_PORT_0_IF		P0IF
+#define HAL_KEY_CPU_PORT_2_IF		P2IF
 
 /* S1 is at P0.0 */
-#define HAL_KEY_SW_1_PORT     P0
-#define HAL_KEY_SW_1_BIT      BV(0)
-#define HAL_KEY_SW_1_SEL      P0SEL
-#define HAL_KEY_SW_1_DIR      P0DIR
+#define HAL_KEY_SW_1_PORT		P0
+#define HAL_KEY_SW_1_BIT		BV(0)
+#define HAL_KEY_SW_1_SEL		P0SEL
+#define HAL_KEY_SW_1_DIR		P0DIR
 
 /* S2 is at P0.1 */
-#define HAL_KEY_SW_2_PORT     P0
-#define HAL_KEY_SW_2_BIT      BV(1)
-#define HAL_KEY_SW_2_SEL      P0SEL
-#define HAL_KEY_SW_2_DIR      P0DIR
+#define HAL_KEY_SW_2_PORT		P0
+#define HAL_KEY_SW_2_BIT		BV(1)
+#define HAL_KEY_SW_2_SEL		P0SEL
+#define HAL_KEY_SW_2_DIR		P0DIR
 
 /* S3 is at P0.2 */
-#define HAL_KEY_SW_3_PORT     P0
-#define HAL_KEY_SW_3_BIT      BV(2)
-#define HAL_KEY_SW_3_SEL      P0SEL
-#define HAL_KEY_SW_3_DIR      P0DIR
+#define HAL_KEY_SW_3_PORT		P0
+#define HAL_KEY_SW_3_BIT		BV(2)
+#define HAL_KEY_SW_3_SEL		P0SEL
+#define HAL_KEY_SW_3_DIR		P0DIR
 
 
-#define HAL_KEY_SW_1_IEN      IEN1  /* CPU interrupt mask register */
-#define HAL_KEY_SW_1_ICTL     P0IEN /* Port Interrupt Control register */
-#define HAL_KEY_SW_1_ICTLBIT  BV(0) /* P0IEN - P0.0 enable/disable bit */
-#define HAL_KEY_SW_1_IENBIT   BV(5) /* Mask bit for all of Port_0 */
-#define HAL_KEY_SW_1_PXIFG    P0IFG /* Interrupt flag at source */
+#define HAL_KEY_SW_1_IEN		IEN1	/* CPU interrupt mask register */
+#define HAL_KEY_SW_1_ICTL		P0IEN	/* Port Interrupt Control register */
+#define HAL_KEY_SW_1_ICTLBIT		BV(0)	/* P0IEN - P0.0 enable/disable bit */
+#define HAL_KEY_SW_1_IENBIT		BV(5)	/* Mask bit for all of Port_0 */
+#define HAL_KEY_SW_1_PXIFG		P0IFG	/* Interrupt flag at source */
 
-#define HAL_KEY_SW_2_IEN      IEN1  /* CPU interrupt mask register */
-#define HAL_KEY_SW_2_ICTL     P0IEN /* Port Interrupt Control register */
-#define HAL_KEY_SW_2_ICTLBIT  BV(1) /* P0IEN - P0.1 enable/disable bit */
-#define HAL_KEY_SW_2_IENBIT   BV(5) /* Mask bit for all of Port_1 */
-#define HAL_KEY_SW_2_PXIFG    P0IFG /* Interrupt flag at source */
+#define HAL_KEY_SW_2_IEN		IEN1	/* CPU interrupt mask register */
+#define HAL_KEY_SW_2_ICTL		P0IEN	/* Port Interrupt Control register */
+#define HAL_KEY_SW_2_ICTLBIT		BV(1)	/* P0IEN - P0.1 enable/disable bit */
+#define HAL_KEY_SW_2_IENBIT		BV(5)	/* Mask bit for all of Port_1 */
+#define HAL_KEY_SW_2_PXIFG		P0IFG	/* Interrupt flag at source */
 
-#define HAL_KEY_SW_3_IEN      IEN1  /* CPU interrupt mask register */
-#define HAL_KEY_SW_3_ICTL     P0IEN /* Port Interrupt Control register */
-#define HAL_KEY_SW_3_ICTLBIT  BV(2) /* P0IEN - P0.2 enable/disable bit */
-#define HAL_KEY_SW_3_IENBIT   BV(5) /* Mask bit for all of Port_1 */
-#define HAL_KEY_SW_3_PXIFG    P0IFG /* Interrupt flag at source */
+#define HAL_KEY_SW_3_IEN		IEN1	/* CPU interrupt mask register */
+#define HAL_KEY_SW_3_ICTL		P0IEN	/* Port Interrupt Control register */
+#define HAL_KEY_SW_3_ICTLBIT		BV(2)	/* P0IEN - P0.2 enable/disable bit */
+#define HAL_KEY_SW_3_IENBIT		BV(5)	/* Mask bit for all of Port_1 */
+#define HAL_KEY_SW_3_PXIFG		P0IFG	/* Interrupt flag at source */
 
-#define HAL_KEY_SW_1_EDGEBIT    BV(0)
-#define HAL_KEY_SW_2_3_EDGEBIT  BV(2)
+#define HAL_KEY_SW_1_EDGEBIT		BV(0)
+#define HAL_KEY_SW_2_3_EDGEBIT  	BV(2)
 
 /**************************************************************************************************
  * TYPEDEFS
  **************************************************************************************************/
-typedef void (*halKeyCBack_t) (uint8 keys, uint8 state);
+typedef void	(*halKeyCBack_t)(uint8 keys, uint8 state);
 
 /**************************************************************************************************
  *                                             GLOBAL VARIABLES
  **************************************************************************************************/
-extern bool Hal_KeyIntEnable;
+extern bool	Hal_KeyIntEnable;
 
 /**************************************************************************************************
  *                                             FUNCTIONS - API
@@ -134,37 +134,37 @@ extern bool Hal_KeyIntEnable;
 /*
  * Initialize the Key Service
  */
-extern void HalKeyInit( void );
+extern void HalKeyInit(void);
 
 /*
  * Configure the Key Service
  */
-extern void HalKeyConfig( bool interruptEnable, const halKeyCBack_t cback);
+extern void HalKeyConfig(bool interruptEnable, const halKeyCBack_t cback);
 
 /*
  * Read the Key status
  */
-extern uint8 HalKeyRead( void);
+extern uint8 HalKeyRead(void);
 
 /*
  * Enter sleep mode, store important values
  */
-extern void HalKeyEnterSleep ( void );
+extern void HalKeyEnterSleep(void);
 
 /*
  * Exit sleep mode, retore values
  */
-extern uint8 HalKeyExitSleep ( void );
+extern uint8 HalKeyExitSleep(void);
 
 /*
  * This is for internal used by hal_driver
  */
-extern void HalKeyPoll ( void );
+extern void HalKeyPoll(void);
 
 /*
  * This is for internal used by hal_sleep
  */
-extern bool HalKeyPressed( void );
+extern bool HalKeyPressed(void);
 
 void halProcessKeyInterrupt(void);
 

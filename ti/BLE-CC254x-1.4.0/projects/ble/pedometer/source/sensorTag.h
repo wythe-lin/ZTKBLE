@@ -139,6 +139,7 @@ typedef enum {
 	PWMGR_S1,		// oled screen saving
 	PWMGR_S2,		// g-sensor active only
 	PWMGR_S3,		// CPU halt
+	PWMGR_S4,		// CPU halt
 } pwmgr_t;
 
 

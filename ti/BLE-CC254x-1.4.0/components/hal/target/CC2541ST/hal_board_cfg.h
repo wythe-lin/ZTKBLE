@@ -130,7 +130,7 @@
 #define LED3_POLARITY		ACTIVE_LOW
 
 /* ------------------------------------------------------------------------------------------------
- * Voltage Detect Configuration
+ * Battery Voltage Detect Configuration
  * ------------------------------------------------------------------------------------------------
  */
 #define BATT_BV			BV(7)
@@ -139,6 +139,16 @@
 #define BATT_SEL		P0SEL
 #define BATT_INP		P0INP
 #define BATT_ACG		APCFG
+
+/* ------------------------------------------------------------------------------------------------
+ * Battery Charge Detect Configuration
+ * ------------------------------------------------------------------------------------------------
+ */
+#define BATCD_BV		BV(4)
+#define BATCD_SBIT		P1_4
+#define BATCD_DDR		P1DIR
+#define BATCD_SEL		P1SEL
+#define BATCD_INP		P1INP
 
 /* ------------------------------------------------------------------------------------------------
  * Motor Configuration
@@ -265,25 +275,30 @@
 	PREFETCH_ENABLE();							\
 										\
 	/* LEDs */								\
-	LED1_SEL    &= ~LED1_BV;						\
-	LED2_SEL    &= ~LED2_BV;						\
-	LED3_SEL    &= ~LED3_BV;						\
-	LED1_SBIT    =  LED1_POLARITY(0);					\
-	LED2_SBIT    =  LED2_POLARITY(0);					\
-	LED3_SBIT    =  LED3_POLARITY(0);					\
-	LED1_DDR    |=  LED1_BV;						\
-	LED2_DDR    |=  LED2_BV;						\
-	LED3_DDR    |=  LED3_BV;						\
+	LED1_SEL   &= ~LED1_BV;							\
+	LED2_SEL   &= ~LED2_BV;							\
+	LED3_SEL   &= ~LED3_BV;							\
+	LED1_SBIT   =  LED1_POLARITY(0);					\
+	LED2_SBIT   =  LED2_POLARITY(0);					\
+	LED3_SBIT   =  LED3_POLARITY(0);					\
+	LED1_DDR   |=  LED1_BV;							\
+	LED2_DDR   |=  LED2_BV;							\
+	LED3_DDR   |=  LED3_BV;							\
 										\
 	/* motor control pin */							\
-	MOTOR_SEL   &= ~MOTOR_BV;	/* general-purpose I/O */		\
-	MOTOR_SBIT   = 0;		/* output low */			\
-	MOTOR_DDR   |=  MOTOR_BV;	/* output */				\
+	MOTOR_SEL  &= ~MOTOR_BV;	/* general-purpose I/O */		\
+	MOTOR_SBIT  = 0;		/* output low */			\
+	MOTOR_DDR  |=  MOTOR_BV;	/* output */				\
 										\
-	/* battery detect pin */						\
-	BATT_SEL    |=  BATT_BV;	/* peripheral function */		\
-	BATT_INP    |=  BATT_BV;	/* input mode 3-state */		\
-	BATT_DDR    &= ~BATT_BV;	/* input mode */			\
+	/* battery voltage detect pin */					\
+	BATT_SEL   |=  BATT_BV;		/* peripheral function */		\
+	BATT_INP   |=  BATT_BV;		/* input mode 3-state */		\
+	BATT_DDR   &= ~BATT_BV;		/* input mode */			\
+										\
+	/* battery charge detect pin */						\
+	BATCD_SEL  &= ~BATCD_BV;	/* general-purpose I/O */		\
+	BATCD_INP  &= ~BATCD_BV;	/* input mode pull-up */		\
+	BATCD_DDR  &= ~BATCD_BV;	/* input mode */			\
 }
 
 

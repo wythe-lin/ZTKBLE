@@ -106,7 +106,7 @@ char adxl345_init(void)
 	}
 
 	adxl345_reg_write(XL345_FIFO_CTL,	XL345_FIFO_RESET);				// FIFO reset & bypass
-	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_100);				// output data rate: 100Hz
+	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_50);					// output data rate: 100Hz
 	adxl345_reg_write(XL345_DATA_FORMAT,	XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: +/-16g range, right justified,  256->1g
 //	adxl345_reg_write(XL345_FIFO_CTL,	XL345_FIFO_MODE_FIFO | 0x0A);			// FIFO mode, samples = 10
 //	adxl345_reg_write(XL345_INT_ENABLE,	XL345_DATAREADY);				// INT_Enable: water mark
@@ -205,14 +205,22 @@ void adxl345_self_calibration(void)
 	unsigned char	z0, z1;
 	unsigned char	intsrc, n;
 	long		cx, cy, cz;
+	unsigned char	inten, bwrate, dformat;
+
 
 	// enter self calibration
 	adxl345_select();
-	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_100);				// output data rate: 100Hz
-	adxl345_reg_write(XL345_DATA_FORMAT,	XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// All g-ranges, full resolution,  256LSB/g
-	adxl345_reg_write(XL345_OFSX,		0);
-	adxl345_reg_write(XL345_OFSY,		0);
-	adxl345_reg_write(XL345_OFSZ,		0);
+
+	adxl345_reg_read(XL345_BW_RATE,     &bwrate);
+	adxl345_reg_read(XL345_DATA_FORMAT, &dformat);
+	adxl345_reg_read(XL345_INT_ENABLE,  &inten);
+
+	adxl345_reg_write(XL345_BW_RATE,     XL345_RATE_100);				// output data rate: 100Hz
+	adxl345_reg_write(XL345_DATA_FORMAT, XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// All g-ranges, full resolution,  256LSB/g
+	adxl345_reg_write(XL345_INT_ENABLE,  0);
+	adxl345_reg_write(XL345_OFSX,	     0);
+	adxl345_reg_write(XL345_OFSY,	     0);
+	adxl345_reg_write(XL345_OFSZ,	     0);
 
 	// get samples
 	cx = 0;	cy = 0;	cz = 0;
@@ -265,7 +273,10 @@ not_ready:
 	cy = ((unsigned short) y1) << 8 | y0;
 	cz = ((unsigned short) z1) << 8 | z0;
 
-
+	// 
+	adxl345_reg_write(XL345_BW_RATE,     bwrate);
+	adxl345_reg_write(XL345_DATA_FORMAT, dformat);
+	adxl345_reg_write(XL345_INT_ENABLE,  inten);
 }
 
 

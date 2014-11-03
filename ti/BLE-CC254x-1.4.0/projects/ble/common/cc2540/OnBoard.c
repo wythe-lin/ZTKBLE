@@ -111,9 +111,9 @@ void InitBoard(uint8 level)
 {
 	if (level == OB_COLD) {
 		// Interrupts off
-		osal_int_disable( INTS_ALL );
+		osal_int_disable(INTS_ALL);
 		// Turn all LEDs off
-		HalLedSet( HAL_LED_ALL, HAL_LED_MODE_OFF );
+		HalLedSet(HAL_LED_ALL, HAL_LED_MODE_OFF);
 		// Check for Brown-Out reset
 //		ChkReset();
 	} else {// !OB_COLD
@@ -188,16 +188,15 @@ void _itoa(uint16 num, uint8 *buf, uint8 radix)
  * If a task registers, it will get all the keys. You can change this
  * to register for individual keys.
  *********************************************************************/
-uint8 RegisterForKeys( uint8 task_id )
+uint8 RegisterForKeys(uint8 task_id)
 {
-  // Allow only the first task
-  if ( registeredKeysTaskID == NO_TASK_ID )
-  {
-    registeredKeysTaskID = task_id;
-    return ( true );
-  }
-  else
-    return ( false );
+	// Allow only the first task
+	if (registeredKeysTaskID == NO_TASK_ID) {
+		registeredKeysTaskID = task_id;
+		return (true);
+	} else {
+		return (false);
+	}
 }
 
 /*********************************************************************
@@ -212,15 +211,15 @@ uint8 RegisterForKeys( uint8 task_id )
  *********************************************************************/
 uint8 OnBoard_SendKeys(uint8 keys, uint8 state)
 {
-	keyChange_t *msgPtr;
+	keyChange_t	*msgPtr;
 
 	if (registeredKeysTaskID != NO_TASK_ID) {
 		// Send the address to the task
-		msgPtr = (keyChange_t *)osal_msg_allocate( sizeof(keyChange_t) );
+		msgPtr = (keyChange_t *) osal_msg_allocate(sizeof(keyChange_t));
 		if (msgPtr) {
 			msgPtr->hdr.event = KEY_CHANGE;
-			msgPtr->state = state;
-			msgPtr->keys = keys;
+			msgPtr->state     = state;
+			msgPtr->keys      = keys;
 
 			osal_msg_send(registeredKeysTaskID, (uint8 *) msgPtr);
 		}
@@ -249,7 +248,7 @@ void OnBoard_KeyCallback(uint8 keys, uint8 state)
 	// applications should not use S1 when key interrupt is enabled
 	shift = (OnboardKeyIntEnable == HAL_KEY_INTERRUPT_ENABLE) ? false : ((keys & HAL_KEY_SW_6) ? true : false);
 
-	if (OnBoard_SendKeys( keys, shift ) != SUCCESS) {
+	if (OnBoard_SendKeys(keys, shift) != SUCCESS) {
 		// Process SW1 here
 		if (keys & HAL_KEY_SW_1) {	// Switch 1
 		}

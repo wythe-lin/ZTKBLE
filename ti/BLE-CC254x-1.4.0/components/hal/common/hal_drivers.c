@@ -116,48 +116,48 @@ void HalDriverInit (void)
 
   /* ADC */
 #if (defined HAL_ADC) && (HAL_ADC == TRUE)
-  HalAdcInit();
+	HalAdcInit();
 #endif
 
   /* DMA */
 #if (defined HAL_DMA) && (HAL_DMA == TRUE)
-  // Must be called before the init call to any module that uses DMA.
-  HalDmaInit();
+	// Must be called before the init call to any module that uses DMA.
+	HalDmaInit();
 #endif
 
   /* AES */
 #if (defined HAL_AES) && (HAL_AES == TRUE)
-  HalAesInit();
+	HalAesInit();
 #endif
 
   /* LCD */
 #if (defined HAL_LCD) && (HAL_LCD == TRUE)
-  HalLcdInit();
+	HalLcdInit();
 #endif
 
   /* LED */
 #if (defined HAL_LED) && (HAL_LED == TRUE)
-  HalLedInit();
+	HalLedInit();
 #endif
 
   /* UART */
 #if (defined HAL_UART) && (HAL_UART == TRUE)
-  HalUARTInit();
+	HalUARTInit();
 #endif
 
   /* KEY */
 #if (defined HAL_KEY) && (HAL_KEY == TRUE)
-  HalKeyInit();
+	HalKeyInit();
 #endif
   
   /* SPI */
 #if (defined HAL_SPI) && (HAL_SPI == TRUE)
-  HalSpiInit();
+	HalSpiInit();
 #endif
 
   /* HID */
 #if (defined HAL_HID) && (HAL_HID == TRUE)
-  usbHidInit();
+	usbHidInit();
 #endif
 }
 
@@ -218,7 +218,7 @@ uint16 Hal_ProcessEvent(uint8 task_id, uint16 events)
 
 		/* if interrupt disabled, do next polling */
 		if (!Hal_KeyIntEnable) {
-			osal_start_timerEx( Hal_TaskID, HAL_KEY_EVENT, 100);
+			osal_start_timerEx(Hal_TaskID, HAL_KEY_EVENT, 100);
 		}
 #endif
 		return events ^ HAL_KEY_EVENT;
@@ -257,26 +257,26 @@ uint16 Hal_ProcessEvent(uint8 task_id, uint16 events)
  *
  * @return  None
  **************************************************************************************************/
-void Hal_ProcessPoll ()
+void Hal_ProcessPoll(void)
 {
-#if defined( POWER_SAVING )
-  /* Allow sleep before the next OSAL event loop */
-  ALLOW_SLEEP_MODE();
+#if defined(POWER_SAVING)
+	/* Allow sleep before the next OSAL event loop */
+	ALLOW_SLEEP_MODE();
 #endif
   
-  /* UART Poll */
+	/* UART Poll */
 #if (defined HAL_UART) && (HAL_UART == TRUE)
-  HalUARTPoll();
+	HalUARTPoll();
 #endif
   
-  /* SPI Poll */
+	/* SPI Poll */
 #if (defined HAL_SPI) && (HAL_SPI == TRUE)
-  HalSpiPoll();
+	HalSpiPoll();
 #endif
 
-  /* HID poll */
+	/* HID poll */
 #if (defined HAL_HID) && (HAL_HID == TRUE)
-  usbHidProcessEvents();
+	usbHidProcessEvents();
 #endif
  
 }

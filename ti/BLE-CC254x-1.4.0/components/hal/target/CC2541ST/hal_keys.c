@@ -200,6 +200,7 @@ void HalKeyConfig(bool interruptEnable, halKeyCBack_t cback)
 		if (HalKeyConfigured == TRUE) {
 			osal_stop_timerEx(Hal_TaskID, HAL_KEY_EVENT);	/* Cancel polling if active */
 		}
+
 	} else { /* Interrupts NOT enabled */
 		HAL_KEY_SW_1_ICTL &= ~(HAL_KEY_SW_1_ICTLBIT);		/* don't generate interrupt */
 		HAL_KEY_SW_1_IEN  &= ~(HAL_KEY_SW_1_IENBIT);		/* Clear interrupt enable bit */
@@ -310,7 +311,7 @@ void halProcessKeyInterrupt(void)
 {
 	bool	valid = FALSE;
 
-	if( HAL_KEY_SW_1_PXIFG & HAL_KEY_SW_1_BIT) {			/* Interrupt Flag has been set by SW1 */
+	if (HAL_KEY_SW_1_PXIFG & HAL_KEY_SW_1_BIT) {			/* Interrupt Flag has been set by SW1 */
 		HAL_KEY_SW_1_PXIFG = ~(HAL_KEY_SW_1_BIT);		/* Clear Interrupt Flag */
 		valid = TRUE;
 	}

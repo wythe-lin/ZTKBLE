@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=1039677639
+Checksum=-364333255
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -41,9 +41,7 @@ Fmt9={W}0:reading	4	0
 [Breakpoints]
 Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
 Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.489.1" 0 0 0 0 "" 0 ""
-Bp2=_ "STD_CODE" "{$PROJ_DIR$\..\source\SensorTag.c}.1211.4" 1 0 0 0 "" 0 ""
-Bp3=_ "STD_CODE" "{$PROJ_DIR$\..\source\SensorTag.c}.1227.3" 1 0 0 0 "" 0 ""
-Count=4
+Count=2
 [ChipconEmu]
 Stop timers on halt=0
 Leave target running=1
