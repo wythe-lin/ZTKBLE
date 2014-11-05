@@ -21,7 +21,12 @@
  *
  ******************************************************************************
  */
+
+#include <hal_board.h>
 #include <hal_i2c.h>
+#include <osal.h>
+
+#include "sensorTag.h"
 #include "adxl345.h"
 
 
@@ -32,7 +37,7 @@
  *
  *****************************************************************************
  */
-#define DBG_MSG			0
+#define DBG_MSG			1
 #if (DBG_MSG == 1)
     #include <stdio.h>
     #define dmsg(x)		printf x
@@ -90,82 +95,175 @@ static unsigned char adxl345_reg_read(unsigned char addr, unsigned char *val)
  *
  ******************************************************************************
  */
-char adxl345_init(void)
+/*
+ * software reset
+ */
+void adxl345_softrst(void)
+{
+	adxl345_select();
+
+	adxl345_reg_write(XL345_INT_ENABLE,    0);
+	adxl345_reg_write(XL345_OFSX,	       0);
+	adxl345_reg_write(XL345_OFSY,	       0);
+	adxl345_reg_write(XL345_OFSZ,	       0);
+	adxl345_reg_write(XL345_THRESH_ACT,    0);
+	adxl345_reg_write(XL345_ACT_INACT_CTL, 0);
+	adxl345_reg_write(XL345_FIFO_CTL,      0);
+
+	// CPU I/O function
+	GSINT1_SEL &= ~GSINT1_BV;
+	GSINT1_DDR &= ~GSINT1_BV;
+
+	GSINT2_SEL &= ~GSINT2_BV;
+	GSINT2_DDR &= ~GSINT2_BV;
+
+	// CPU interrupt register
+	GSINT_IEN  &= ~GSINT_IENBIT;
+	GSINT_ICTL &= ~(GSINT1_BV | GSINT2_BV);
+	GSINT_PXIFG = ~(GSINT1_BV | GSINT2_BV);
+}
+
+
+/*
+ * activity detection
+ */
+void adxl345_activity(unsigned char threshold)
+{
+	unsigned char	ctrl, inten;
+
+	GSINT_IEN  &= ~GSINT_IENBIT;
+	GSINT_ICTL &= ~GSINT1_BV;
+	GSINT_PXIFG = ~GSINT1_BV;
+
+	adxl345_select();
+	adxl345_reg_read(XL345_ACT_INACT_CTL, &ctrl);
+	adxl345_reg_read(XL345_INT_ENABLE, &inten);
+	if (threshold) {
+		ctrl  |= (XL345_ACT_AC | XL345_ACT_X_ENB | XL345_ACT_Y_ENB | XL345_ACT_Z_ENB);
+		inten |= XL345_ACTIVITY;
+		adxl345_reg_write(XL345_THRESH_ACT, threshold);		// 62.5mg/LSB
+		adxl345_reg_write(XL345_ACT_INACT_CTL, ctrl);
+		adxl345_reg_write(XL345_INT_ENABLE, inten);
+		GSINT_ICTL |=  GSINT1_BV;
+	} else {
+		ctrl  &= 0x0F;
+		inten &= ~XL345_ACTIVITY;
+		adxl345_reg_write(XL345_INT_ENABLE, inten);
+		adxl345_reg_write(XL345_ACT_INACT_CTL, ctrl);
+		adxl345_reg_write(XL345_THRESH_ACT, 0);
+	}
+	GSINT_IEN |= GSINT_IENBIT;
+}
+
+
+void adxl345_sampling(unsigned char rate)
+{
+	unsigned char	inten;
+
+	GSINT_IEN  &= ~GSINT_IENBIT;
+	GSINT_ICTL &= ~GSINT2_BV;
+	GSINT_PXIFG = ~GSINT2_BV;
+
+	adxl345_select();
+	adxl345_reg_write(XL345_FIFO_CTL,  0);
+	adxl345_reg_read(XL345_INT_ENABLE, &inten);
+	if (rate) {
+		inten |= XL345_WATERMARK;
+		adxl345_reg_write(XL345_BW_RATE, rate);
+		adxl345_reg_write(XL345_INT_ENABLE, inten);
+		GSINT_ICTL |=  GSINT2_BV;
+	} else {
+		inten &= ~XL345_WATERMARK;
+		adxl345_reg_write(XL345_BW_RATE, XL345_RATE_25);					// sampling rate: 25Hz
+		adxl345_reg_write(XL345_INT_ENABLE, inten);
+	}
+	adxl345_reg_write(XL345_INT_MAP,     XL345_WATERMARK);						// INT_MAP: water mark interrupt to the INT2 pin
+	adxl345_reg_write(XL345_DATA_FORMAT, XL345_INT_LOW | XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: +/-16g range, right justified,  256->1g
+	adxl345_reg_write(XL345_FIFO_CTL,    XL345_FIFO_MODE_FIFO | 10);				// FIFO_CTL: FIFO mode, samples = 10 
+	adxl345_reg_write(XL345_POWER_CTL,   XL345_MEASURE);						// POWER_CTL: measure mode
+
+	GSINT_IEN |= GSINT_IENBIT;
+}
+
+
+
+/*
+ * sleep
+ */
+void adxl345_enter_sleep(void)
+{
+	adxl345_sampling(0);
+	adxl345_activity(16);
+}
+
+void adxl345_exit_sleep(void)
+{
+	adxl345_sampling(XL345_BW_50);
+	adxl345_activity(0);
+}
+
+void adxl345_shutdown(void)
+{
+	adxl345_sampling(0);
+	adxl345_activity(0);
+}
+
+char adxl345_chk_dev(void)
 {
 	unsigned char	devid;
 
 	adxl345_select();
-
 	if (!adxl345_reg_read(XL345_DEVID, &devid)) {
-		dmsg(("adxl345 read devid i2c fail\n"));
+		dmsg(("[adxl345]: read devid i2c fail\n"));
 		return 0;
 	}
 	if (devid != 0xe5) {
-		dmsg(("adxl345 devid=%02x is not 0xE5\n", devid));
+		dmsg(("[adxl345]: devid=%02x is not 0xE5\n", devid));
 		return 0;
 	}
-
-	adxl345_reg_write(XL345_FIFO_CTL,	XL345_FIFO_RESET);				// FIFO reset & bypass
-	adxl345_reg_write(XL345_BW_RATE,	XL345_RATE_50);					// output data rate: 100Hz
-	adxl345_reg_write(XL345_DATA_FORMAT,	XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: +/-16g range, right justified,  256->1g
-//	adxl345_reg_write(XL345_FIFO_CTL,	XL345_FIFO_MODE_FIFO | 0x0A);			// FIFO mode, samples = 10
-//	adxl345_reg_write(XL345_INT_ENABLE,	XL345_DATAREADY);				// INT_Enable: water mark
-//	adxl345_reg_write(XL345_INT_MAP,	XL345_DATAREADY);				// INT_Map: water mark interrupt to the INT2 pin
-	adxl345_reg_write(XL345_POWER_CTL,	XL345_MEASURE);					// power control: measure mode
 	return 1;
 }
 
-char adxl345_read(unsigned short *p)
+
+unsigned char adxl345_chk_fifo(void)
 {
-	unsigned char	intsrc, i;
+	unsigned char	intsrc;
+	unsigned char	ret = 0;
+
+	adxl345_select();
+	adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
+	if ((intsrc & XL345_WATERMARK) != XL345_WATERMARK) {
+		return ret;
+	}
+
+	adxl345_reg_read(XL345_FIFO_STATUS, &ret);
+	return ret;
+}
+
+
+/*
+ * read sampling
+ */
+void adxl345_read(unsigned short *p)
+{
+	unsigned char	i;
 	unsigned char	x0, x1;
 	unsigned char	y0, y1;
 	unsigned char	z0, z1;
-	char		ret;
-
-	// check data ready
-	ret = -1;
-
-	adxl345_select();
-	if (!adxl345_reg_read(XL345_INT_SOURCE, &intsrc)) {
-		return ret;
-	}
-	if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {	// water mark interrupt
-		return ret;
-	}
 
 	// read the three registers
-	ret = 1;
+	adxl345_reg_read(XL345_DATAX0, &x0);
+	adxl345_reg_read(XL345_DATAX1, &x1);
 
-	if (!adxl345_reg_read(XL345_DATAX0, &x0)) {
-		return ret;
-	}
-	if (!adxl345_reg_read(XL345_DATAX1, &x1)) {
-		return ret;
-	}
+	adxl345_reg_read(XL345_DATAY0, &y0);
+	adxl345_reg_read(XL345_DATAY1, &y1);
 
-	if (!adxl345_reg_read(XL345_DATAY0, &y0)) {
-		return ret;
-	}
-	if (!adxl345_reg_read(XL345_DATAY1, &y1)) {
-		return ret;
-	}
-
-	if (!adxl345_reg_read(XL345_DATAZ0, &z0)) {
-		return ret;
-	}
-	if (!adxl345_reg_read(XL345_DATAZ1, &z1)) {
-		return ret;
-	}
-
-	// valid data
-	ret  = 0;
+	adxl345_reg_read(XL345_DATAZ0, &z0);
+	adxl345_reg_read(XL345_DATAZ1, &z1);
 
 	p[0] = ((unsigned short) x1) << 8 | x0;
 	p[1] = ((unsigned short) y1) << 8 | y0;
 	p[2] = ((unsigned short) z1) << 8 | z0;
-
-	dmsg(("X=%04x, Y=%04x, Z=%04x\n", p[0], p[1], p[2]));
 
 	// translate the two's complement to true binary code
 	for (i=0; i<3; i++) {
@@ -173,30 +271,28 @@ char adxl345_read(unsigned short *p)
 			p[i] = (p[i] ^ 0xFFFF) + 1;
 		}
 	}
-
-	return ret;
 }
 
 
-void adxl345_enter_sleep(void)
+/*
+ * ISR
+ */
+void adxl345_int1_isr(void)
 {
-//	adxl345_reg_write(XL345_POWER_CTL, XL345_STANDBY);
+	osal_set_event(sensorTag_TaskID, EVT_GSNINT1);
+//	GSINT_PXIFG = ~(GSINT1_BV);
 }
 
-
-void adxl345_exit_sleep(void)
+void adxl345_int2_isr(void)
 {
-	char	retry;
-
-	for (retry=0; retry<3; retry++) {
-		if (adxl345_init()) {
-			break;
-		}
-	}
-
+	osal_set_event(sensorTag_TaskID, EVT_GSNINT2);
+//	GSINT_PXIFG = ~(GSINT2_BV);
 }
 
 
+/*
+ * calibration
+ */
 #define ADXL345_CALIB_NUM	16
 void adxl345_self_calibration(void)
 {

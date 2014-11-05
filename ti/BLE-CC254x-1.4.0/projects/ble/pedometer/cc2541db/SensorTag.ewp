@@ -3274,9 +3274,6 @@
       <name>$PROJ_DIR$\..\source\OSAL_SensorTag.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\source\pedometer.c</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\source\putchar.c</name>
     </file>
     <file>
@@ -3287,6 +3284,9 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\ssd1306.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\..\source\steps.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\uart.c</name>

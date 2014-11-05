@@ -150,6 +150,11 @@
 #define BATCD_SEL		P1SEL
 #define BATCD_INP		P1INP
 
+#define BATCD_IEN		IEN2		// CPU interrupt mask register
+#define BATCD_ICTL		P1IEN		// port interrupt control register
+#define BATCD_PXIFG		P1IFG		// interrupt flag at source
+#define BATCD_IENBIT		BV(4)		// mask bit for all of port 0
+
 /* ------------------------------------------------------------------------------------------------
  * Motor Configuration
  * ------------------------------------------------------------------------------------------------
@@ -159,23 +164,33 @@
 #define MOTOR_DDR		P0DIR
 #define MOTOR_SEL		P0SEL
 
-
 /* ------------------------------------------------------------------------------------------------
- * Sensor Configuration
+ * G-Sensor Configuration
  * ------------------------------------------------------------------------------------------------
  */
 ///* Accelerometer interrupt */
-//#define ACC_INT_BV        BV(2)
-//#define ACC_INT_SBIT      P0_2
-//#define ACC_INT_DDR       P0DIR
-//#define ACC_INT_SEL       P0SEL
+#define GSINT1_BV		BV(1)
+#define GSINT1_SBIT		P0_1
+#define GSINT1_DDR		P0DIR
+#define GSINT1_SEL		P0SEL
+
+#define GSINT2_BV		BV(2)
+#define GSINT2_SBIT		P0_2
+#define GSINT2_DDR		P0DIR
+#define GSINT2_SEL		P0SEL
+
+#define GSINT_IEN		IEN1		// CPU interrupt mask register
+#define GSINT_ICTL		P0IEN		// port interrupt control register
+#define GSINT_PXIFG		P0IFG		// interrupt flag at source
+#define GSINT_IENBIT		BV(5)		// mask bit for all of port 0
+
 
 /* ------------------------------------------------------------------------------------------------
  *                                    Push Button Configuration
  * ------------------------------------------------------------------------------------------------
  */
-
 /* See hal_keys.h */
+
 
 /* ------------------------------------------------------------------------------------------------
  *                         OSAL NV implemented by internal flash pages.
@@ -296,9 +311,11 @@
 	BATT_DDR   &= ~BATT_BV;		/* input mode */			\
 										\
 	/* battery charge detect pin */						\
-	BATCD_SEL  &= ~BATCD_BV;	/* general-purpose I/O */		\
+	BATCD_SEL  |=  BATCD_BV;	/* peripheral function */		\
 	BATCD_INP  &= ~BATCD_BV;	/* input mode pull-up */		\
 	BATCD_DDR  &= ~BATCD_BV;	/* input mode */			\
+										\
+	BATCD_ICTL |=  BATCD_BV;	/* port interrupt control register */	\
 }
 
 

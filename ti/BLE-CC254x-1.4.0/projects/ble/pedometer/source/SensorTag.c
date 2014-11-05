@@ -87,7 +87,7 @@
 //#include "kxti9-1001.h"
 #include "adxl345.h"
 
-#include "pedometer.h"
+#include "steps.h"
 
 /*
  *****************************************************************************
@@ -96,12 +96,63 @@
  *
  *****************************************************************************
  */
-#define DBG_MSG			1
-#if (DBG_MSG == 1)
+#define MSG_NONE		0
+#define MSG_DBG			0x0001
+#define MSG_FLOW		0x0002
+#define MSG_PWMGR		0x0004
+#define MSG_BLE			0x0008
+#define MSG_STEPS		0x0010
+#define MSG_BATT		0x0020
+
+#define DEBUG_MESSAGE		\
+(				\
+	MSG_BATT	|	\
+	MSG_STEPS	|	\
+	MSG_BLE		|	\
+	MSG_PWMGR	|	\
+	MSG_FLOW	|	\
+	MSG_DBG		|	\
+	MSG_NONE		\
+)
+
+#if (DEBUG_MESSAGE > 0)
     #include <stdio.h>
+#endif
+#if (DEBUG_MESSAGE & MSG_DBG)
     #define dmsg(x)		printf x
 #else
     #define dmsg(x)
+#endif
+#if (DEBUG_MESSAGE & MSG_FLOW)
+    #define fmsg(x)		printf x
+#else
+    #define fmsg(x)
+#endif
+#if (DEBUG_MESSAGE & MSG_PWMGR)
+    static unsigned char	power_msg;
+    #define pwrmsg(x)		printf x
+    #define pmsg(x)		\
+    if (!power_msg) {		\
+        power_msg = 1;		\
+        pwrmsg(x);		\
+    }
+#else
+    #define pmsg(x)
+#endif
+#if (DEBUG_MESSAGE & MSG_BLE)
+    #define btmsg(x)		printf x
+#else
+    #define btmsg(x)
+#endif
+#if (DEBUG_MESSAGE & MSG_STEPS)
+    #define stepmsg(x)		printf x
+#else
+    #define stepmsg(x)
+#endif
+#if (DEBUG_MESSAGE & MSG_BATT)
+    #define battmsg(x)		printf x
+#else
+    #define battmsg(x)
 #endif
 
 
@@ -145,24 +196,25 @@
 
 
 // battery level
-#define BATT_LEVEL_01				(7077)		// 3.7V - 0x1ba5
-#define BATT_LEVEL_02				(6912)		// 3.6V
-#define BATT_LEVEL_03				(6657)		// 3.5V
-#define BATT_LEVEL_04				(6473)		// 3.4V
-#define BATT_LEVEL_05				(6236)		// 3.3V
-#define BATT_LEVEL_06				(5867)		// 3.1V - 0x16eb
+#define BATT_LEVEL_01				(0x1c00)	// 3.7V
+#define BATT_LEVEL_02				(0x1b28)	// 3.6V
+#define BATT_LEVEL_03				(0x1a77)	// 3.5V
+#define BATT_LEVEL_04				(0x1944)	// 3.4V
+#define BATT_LEVEL_05				(0x1898)	// 3.3V
+#define BATT_LEVEL_06				(0x16e7)	// 3.1V
 
 // how often to perform something (milliseconds)
 #define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
 #define PERIOD_MODE_SLEEP			(1000*4)	// into sleep mode
 #define PERIOD_SYSRST				(1000*8)	// system reset
-#define PERIOD_GSENSOR				(20)		// g-sensor
-#define PERIOD_DISP				(200)		// oled display
-#define PERIOD_PWMGR				(1000*10)	// power saving
+#define PERIOD_DISP				(1000/5)	// oled display
 #define PERIOD_RTC				(1000*1)	// real time clock
 
+#define TIME_PWRON				(1)		// power on
+#define TIME_OLED_OFF				(5)		// oled off
+#define TIME_GSEN_OFF				(5)		// g-sensor off
 
-#define PERIOD_SCREEN_SAVING			(5)		// screen saving
+
 
 /*
  *****************************************************************************
@@ -171,7 +223,7 @@
  *
  *****************************************************************************
  */
-
+uint8		sensorTag_TaskID;	// Task ID for internal task/event processing
 
 
 /*
@@ -181,7 +233,7 @@
  *
  *****************************************************************************
  */
-static uint8			sensorTag_TaskID;	// Task ID for internal task/event processing
+
 static gaprole_States_t		gapProfileState = GAPROLE_INIT;
 
 // GAP - SCAN RSP data (max size = 31 bytes)
@@ -247,8 +299,6 @@ static uint8		attDeviceName[] = "PT-5200";
 // sensor state variables
 static bool		key1_press	= FALSE;
 
-static unsigned short	gsen_period	= PERIOD_GSENSOR;
-
 static unsigned char	opmode		= MODE_NORMAL;
 static unsigned short	acc[3]		= { 0, 0, 0 };
 
@@ -256,7 +306,10 @@ static unsigned char	charge_icon	= 0;
 static unsigned char	charge_cnt	= 0;
 
 static pwmgr_t		pwmgr;
-static unsigned char	power_saving	= 0;
+static unsigned char	power_saving;
+static unsigned long	steps;
+static unsigned char	batt_level;
+static unsigned char	batt_charging = 0;
 
 
 static struct personal_info 	pi = {
@@ -315,7 +368,7 @@ static void sensorTag_ClockGet(UTCTimeStruct *t, UTCTime delta)
 
 
 /**
- * @fn      sensorTag_BattMeasure
+ * @fn      batt_measure
  *
  * @brief   Measure the battery level with the ADC
  *
@@ -323,34 +376,76 @@ static void sensorTag_ClockGet(UTCTimeStruct *t, UTCTime delta)
  *
  * @return
  */
-static unsigned char sensorTag_BattMeasure(void)
+static unsigned char batt_measure(void)
 {
 	unsigned short	adc;
-	unsigned char	level = 1;
 
 	// configure ADC and perform a read
 	HalAdcSetReference(HAL_ADC_REF_125V);
 	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_14);
-//	dmsg(("adc=%04x\n", adc));
+
 
 	if (!BATCD_SBIT) {
-		level = 7;	// battery charge
+		batt_level = 7;	// battery charge
 	} else if ((adc >= BATT_LEVEL_01)) {
-		level = 6;	// battery full
+		batt_level = 6;	// battery full
 	} else if ((adc >= BATT_LEVEL_02) && (adc < BATT_LEVEL_01)) {
-		level = 5;
+		batt_level = 5;
 	} else if ((adc >= BATT_LEVEL_03) && (adc < BATT_LEVEL_02)) {
-		level = 4;
+		batt_level = 4;
 	} else if ((adc >= BATT_LEVEL_04) && (adc < BATT_LEVEL_03)) {
-		level = 3;
+		batt_level = 3;
 	} else if ((adc >= BATT_LEVEL_05) && (adc < BATT_LEVEL_04)) {
-		level = 2;
+		batt_level = 2;
 	} else if ((adc >= BATT_LEVEL_06) && (adc < BATT_LEVEL_05)) {
-		level = 1;	// battery empty
+		batt_level = 1;	// battery empty
 	} else {
-		level = 0;	// battery shutdown
+		batt_level = 0;	// battery shutdown
 	}
-	return level;
+	battmsg(("adc=%04x, lv=%02x, ac=%02x\n", adc, batt_level, batt_charging));
+	return batt_level;
+}
+
+static unsigned char batt_get_level(void)
+{
+	return batt_level;
+}
+
+void batt_isr(void)
+{
+	batt_charging = 1;
+//	BATCD_PXIFG   = ~(BATCD_BV);
+}
+
+
+/**
+ * @fn      pwmgr_state_change
+ *
+ * @brief   Handles all key events for this device.
+ *
+ * @param   mode - 
+ * @param   time - 
+ *
+ * @return  none
+ */
+static void pwmgr_state_change(pwmgr_t mode, unsigned char time)
+{
+	pwmgr        = mode;
+	power_saving = time;
+
+#if (DEBUG_MESSAGE & MSG_PWMGR)
+	power_msg    = 0;
+#endif
+}
+
+static unsigned char pwmgr_saving_timer(void)
+{
+	if (!power_saving) {
+		return 1;
+	}
+
+	power_saving--;
+	return 0;
 }
 
 
@@ -372,31 +467,20 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 	uint8	current_adv_status;
 
 	if (keys & HAL_KEY_SW_1) {
-		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
-//		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
-
-		// find the current GAP advertising status
-		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
-		if ((current_adv_status == FALSE) && (gapProfileState != GAPROLE_CONNECTED)) {
-			current_adv_status = TRUE;
-			GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
-		}
+		// press KEY1
+		key1_press = TRUE;
 
 		// display
 		vgm064032a1w01_exit_sleep();
 		vgm064032a1w01_clr_screen();
 		osal_set_event(sensorTag_TaskID, EVT_DISP);
 
-		// power management
-		power_saving = PERIOD_SCREEN_SAVING;
-
-		// press KEY1
-		key1_press = TRUE;
-		osal_start_timerEx(sensorTag_TaskID, EVT_MODE,   PERIOD_MODE_SWITCH);
-		osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
-		osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
-
+		// KEY action
 		if (pwmgr == PWMGR_S1) {
+			osal_start_timerEx(sensorTag_TaskID, EVT_MODE,   PERIOD_MODE_SWITCH);
+			osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
+			osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
+
 			switch (opmode & 0xF0) {
 			case MODE_NORMAL:
 				opmode++;
@@ -426,12 +510,33 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 			}
 		}
 
-#if DBG_MSG
-		if (pwmgr != PWMGR_S1) {
-			dmsg(("\033[40;35m\nS1 (full run)\033[0m\n"));
+		// power management
+		switch (pwmgr) {
+		case PWMGR_S5:
+			osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+			pwmgr_state_change(PWMGR_S6, TIME_OLED_OFF);
+
+		case PWMGR_S6:
+			return;
+
+		case PWMGR_S4:
+			adxl345_exit_sleep();
+//			osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
+
+		case PWMGR_S1:
+		default:
+			pwmgr_state_change(PWMGR_S1, TIME_OLED_OFF);
+			break;
 		}
-#endif
-		pwmgr = PWMGR_S1;
+//		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
+
+		// find the current GAP advertising status
+		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
+		if ((current_adv_status == FALSE) && (gapProfileState != GAPROLE_CONNECTED)) {
+			current_adv_status = TRUE;
+			GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8), &current_adv_status);
+		}
+
 	} else {
 		// release KEY1
 		key1_press = FALSE;
@@ -449,11 +554,11 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
  *
  * @return  none
  */
-static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *pMsg)
+static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *msg)
 {
-	switch (pMsg->event) {
+	switch (msg->event) {
 	case KEY_CHANGE:
-		sensorTag_HandleKeys(((keyChange_t *) pMsg)->state, ((keyChange_t *) pMsg)->keys);
+		sensorTag_HandleKeys(((keyChange_t *) msg)->state, ((keyChange_t *) msg)->keys);
 		break;
 
 	default:
@@ -535,7 +640,7 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 		vgm064032a1w01_draw_icon(0, 44, 6);
 
 		// display battery
-		sensorTag_BattDisp(sensorTag_BattMeasure());
+		sensorTag_BattDisp(batt_get_level());
 		return;
 	}
 
@@ -571,7 +676,7 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 			vgm064032a1w01_draw_icon(0, 56, time.seconds%10);
 		}
 		// display battery
-		sensorTag_BattDisp(sensorTag_BattMeasure());
+		sensorTag_BattDisp(batt_get_level());
 		break;
 
 	case MODE_STEP:
@@ -585,9 +690,9 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 		// display step
 		vgm064032a1w01_set_font(&num8x16);
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_num(1, 0, steps_normal);
+			vgm064032a1w01_draw_num(1, 0, normal.steps);
 		} else {
-			vgm064032a1w01_draw_num(1, 0, steps_normal - steps_workout);
+			vgm064032a1w01_draw_num(1, 0, normal.steps - workout.steps);
 		}
 		break;
 
@@ -649,7 +754,7 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 
 		vgm064032a1w01_gotoxy(3, 0);
 		vgm064032a1w01_puts("s:");
-		vgm064032a1w01_puts_05u(steps_normal);
+		vgm064032a1w01_puts_05u(normal.steps);
 		break;
 	}
 }
@@ -689,40 +794,38 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
 			systemId[5] = ownAddress[3];
 
 			DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
-			dmsg(("\033[1;34m{started}\033[0m - %02x:%02x:%02x:%02x:%02x:%02x\n",
+			btmsg(("\033[1;34m{started}\033[0m - %02x:%02x:%02x:%02x:%02x:%02x\n",
 				ownAddress[0], ownAddress[1], ownAddress[2], ownAddress[3], ownAddress[4], ownAddress[5]));
 		}
 		break;
 
 	case GAPROLE_ADVERTISING:
-//		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
-		dmsg(("\033[1;34m{advertising}\033[0m\n"));
+		btmsg(("\033[1;34m{advertising}\033[0m\n"));
 		break;
 
 	case GAPROLE_CONNECTED:
-//		HalLedSet(HAL_LED_1, HAL_LED_MODE_FLASH);
-		dmsg(("\033[1;34m{connected}\033[0m\n"));
+		btmsg(("\033[1;34m{connected}\033[0m\n"));
 		break;
 
 	case GAPROLE_WAITING:
-		dmsg(("\033[1;34m{waiting}\033[0m\n"));
+		btmsg(("\033[1;34m{waiting}\033[0m\n"));
 		break;
 
 	case GAPROLE_CONNECTED_ADV:
-		dmsg(("\033[1;34m{connected adv.}\033[0m\n"));
+		btmsg(("\033[1;34m{connected adv.}\033[0m\n"));
 		break;
 
 	case GAPROLE_WAITING_AFTER_TIMEOUT:
-		dmsg(("\033[1;34m{timeout}\033[0m\n"));
+		btmsg(("\033[1;34m{timeout}\033[0m\n"));
 		break;
 
 	case GAPROLE_ERROR:
-		dmsg(("\033[1;34m{error}\033[0m\n"));
+		btmsg(("\033[1;34m{error}\033[0m\n"));
 		break;
 
 	default:
 	case GAPROLE_INIT:
-		dmsg(("\033[1;34m{init}\033[0m\n"));
+		btmsg(("\033[1;34m{init}\033[0m\n"));
 		break;
 	}
 	gapProfileState = newState;
@@ -773,7 +876,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 		pkt->rsp.set_personal_info_ok.chksum = 0x00;
 		if (chksum_recv != chksum_calc) {
 			pkt->rsp.set_personal_info_ng.id = SET_PERSONAL_INFO_NG_RSP;
-			dmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
+			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
 
@@ -800,7 +903,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			pkt->rsp.get_week_ssdcg_ng.id     = GET_WEEK_SSDCG_NG_RSP;
 			pkt->rsp.get_week_ssdcg_ng.len    = 0x00;
 			pkt->rsp.get_week_ssdcg_ng.chksum = 0x00;
-			dmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
+			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
 
@@ -811,7 +914,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 		pkt->rsp.clr_data_ok.chksum = 0x00;
 		if (chksum_recv != chksum_calc) {
 			pkt->rsp.clr_data_ng.id = CLR_DATA_NG_RSP;
-			dmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
+			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
 
@@ -839,7 +942,7 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			pkt->rsp.set_dev_time_ng.id	= SET_DEV_TIME_NG_RSP;
 			pkt->rsp.set_dev_time_ng.len	= 0;
 			pkt->rsp.set_dev_time_ng.chksum	= 0;
-			dmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
+			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
 
@@ -858,15 +961,11 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			pkt->rsp.get_dev_time_ok.second	= time.seconds;
 			pkt->rsp.get_dev_time_ok.week	= normal.week;
 			pkt->rsp.get_dev_time_ok.chksum	= ptProfile_CalcChksum(pkt->header.len, pkt->header.ptr);
-
-			dmsg(("(%02x, %02x)\n", pkt->rsp.get_dev_time_ok.month, time.month));
-			dmsg(("(%02x, %02x)\n", pkt->rsp.get_dev_time_ok.day, time.day));
-
 		} else {
 			pkt->rsp.get_dev_time_ng.id	= GET_DEV_TIME_NG_RSP;
 			pkt->rsp.get_dev_time_ng.len	= 0;
 			pkt->rsp.get_dev_time_ng.chksum	= 0;
-			dmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
+			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
 
@@ -877,12 +976,12 @@ static char SensorTag_PktParsing(pt_t *pkt)
 	case GET_DEV_DATE_STEPS_REQ:
 	case RST_TO_DEFAULTS_REQ:
 		ret = 0;
-		dmsg(("IN: unused opcode (%02x)\n", pkt->id));
+		btmsg(("IN: unused opcode (%02x)\n", pkt->id));
 		break;
 
 	default:
 		ret = 0;
-		dmsg(("IN: unknown opcode (%02x)\n", pkt->id));
+		btmsg(("IN: unknown opcode (%02x)\n", pkt->id));
 		break;
 	}
 
@@ -1100,17 +1199,17 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	VOID	task_id;	// OSAL required parameter that isn't used in this function
 
 
-	/////////////////////////
-	// handle system event //
-	/////////////////////////
+	///////////////////////////////////////////////////////////////////////
+	// system event handle                                               //
+	///////////////////////////////////////////////////////////////////////
 	if (events & SYS_EVENT_MSG) {
-		uint8	*pMsg;
+		uint8	*msg;
 
-		if ((pMsg = osal_msg_receive(sensorTag_TaskID)) != NULL) {
-			sensorTag_ProcessOSALMsg((osal_event_hdr_t *) pMsg);
+		if ((msg = osal_msg_receive(sensorTag_TaskID)) != NULL) {
+			sensorTag_ProcessOSALMsg((osal_event_hdr_t *) msg);
 
 			// release the OSAL message
-			osal_msg_deallocate(pMsg);
+			osal_msg_deallocate(msg);
 		}
 
 		// return unprocessed events
@@ -1118,9 +1217,9 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	}
 
 
-	////////////////////////
-	// start device event //
-	////////////////////////
+	///////////////////////////////////////////////////////////////////////
+	// start device event                                                //
+	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_START_DEVICE) {
 		// start the device
 		GAPRole_StartDevice(&sensorTag_PeripheralCBs);
@@ -1130,37 +1229,38 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 
 		// start peripheral device
 		vgm064032a1w01_init();
-		adxl345_init();
-		adxl345_self_calibration();
+		adxl345_softrst();
+//		adxl345_self_calibration();
 
-//		osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
+		steps	     = 0;
+		BATCD_PXIFG  = ~(BATCD_BV);
+		BATCD_IEN   |=  BATCD_IENBIT;
+
 		osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+		pwmgr_state_change(PWMGR_S0, 0);
 
-		dmsg(("\033[40;35m\nS0 (power on)\033[0m\n"));
-		pwmgr        = PWMGR_S0;
-		power_saving = 1;
+		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
 		return (events ^ EVT_START_DEVICE);
 	}
 
 
-	//////////////////////////////////
-	// Mode Switch (long press key) //
-	//////////////////////////////////
+	///////////////////////////////////////////////////////////////////////
+	// key long press handle                                             //
+	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_MODE) {
 		if (key1_press) {
 			vgm064032a1w01_clr_screen();
 			if ((opmode & 0xF0) == MODE_NORMAL) {
 				opmode        = MODE_WORKOUT | MODE_TIME;
-				steps_workout = steps_normal;
+				workout.steps = normal.steps;
 				workout.time  = osal_getClock();
-				dmsg(("\033[40;32m[workout mode]\033[0m\n"));
+				fmsg(("\033[40;32m[workout mode]\033[0m\n"));
 			} else {
 				opmode        = MODE_NORMAL | MODE_TIME;
-				dmsg(("\033[40;32m[normal mode]\033[0m\n"));
+				fmsg(("\033[40;32m[normal mode]\033[0m\n"));
 			}
 
-			// power management
-			power_saving = PERIOD_SCREEN_SAVING;
+			pwmgr_state_change(pwmgr, TIME_OLED_OFF);
 		}
 		return (events ^ EVT_MODE);
 	}
@@ -1169,141 +1269,176 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		if (key1_press) {
 			vgm064032a1w01_clr_screen();
 			opmode = MODE_SLEEP;
-			dmsg(("\033[40;32m[sleep mode]\033[0m\n"));
+			fmsg(("\033[40;32m[sleep mode]\033[0m\n"));
 
-			// power management
-			power_saving = PERIOD_SCREEN_SAVING;
+			pwmgr_state_change(pwmgr, TIME_OLED_OFF);
 		}
 		return (events ^ EVT_SLEEP);
 	}
 
 	if (events & EVT_SYSRST) {
 		if (key1_press) {
-			dmsg(("\033[40;32m[system reset]\033[0m\n"));
+			fmsg(("\033[40;32m[system reset]\033[0m\n"));
 			HAL_SYSTEM_RESET();
 		}
 		return (events ^ EVT_SYSRST);
 	}
 
 
-	/////////////
-	// Display //
-	/////////////
+	///////////////////////////////////////////////////////////////////////
+	// display handle                                                    //
+	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_DISP) {
 		sensorTag_HandleDisp(opmode, acc);
-		osal_start_reload_timer(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
+		if (pwmgr != PWMGR_S6)  {
+			osal_start_reload_timer(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
+		}
 		return (events ^ EVT_DISP);
 	}
 
 
-	////////////////
-	// handle RTC //
-	////////////////
+	///////////////////////////////////////////////////////////////////////
+	// g-sensor handle                                                   //
+	///////////////////////////////////////////////////////////////////////
+	if (events & EVT_GSNINT1) {
+		adxl345_exit_sleep();
+		pwmgr_state_change(PWMGR_S3, TIME_GSEN_OFF);
+		return (events ^ EVT_GSNINT1);
+	}
+
+	if (events & EVT_GSNINT2) {
+		unsigned char	sampling;
+		unsigned char	i;
+
+		sampling = adxl345_chk_fifo();
+		for (i=0; i<sampling; i++) {
+			adxl345_read(acc);
+#if (DEBUG_MESSAGE & MSG_STEPS)
+			{
+				unsigned long	tmp = algo_step(acc);
+				if (normal.steps != tmp) {
+					stepmsg(("\033[1;33mstep=%0lu\n\033[0m", tmp));
+				}
+				normal.steps = tmp;
+			}
+#else
+			normal.steps = algo_step(acc);
+#endif
+		}
+
+		normal.distance  =  (normal.steps * pi.stride) / 100UL;
+		workout.distance = ((normal.steps - workout.steps) * pi.stride) / 100UL;
+		normal.calorie   = (unsigned short) ((float) (normal.distance  / 1000UL * pi.weight) * 1.036);
+		workout.calorie  = (unsigned short) ((float) (workout.distance / 1000UL * pi.weight) * 1.036);
+		return (events ^ EVT_GSNINT2);
+	}
+
+	if (events & EVT_GSENSOR) {
+		adxl345_exit_sleep();
+		return (events ^ EVT_GSENSOR);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////
+	// RTC handle                                                        //
+	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_RTC) {
 		// performed once per second
 
+
+		// power management
 		switch (pwmgr) {
 		case PWMGR_S0:
-			if (power_saving--) {
-				if (!power_saving) {
-					osal_pwrmgr_device(PWRMGR_BATTERY);
-					pwmgr = PWMGR_S3;
-				}
+			pmsg(("\033[40;35mS0 (power on)\033[0m\n"));
+			if (pwmgr_saving_timer()) {
+				adxl345_enter_sleep();
+
+				osal_pwrmgr_device(PWRMGR_BATTERY);
+				pwmgr_state_change(PWMGR_S4, 0);
 			}
 			break;
 
 		case PWMGR_S1:
-			if (power_saving--) {
-				if (!power_saving) {
-					dmsg(("\033[40;35mS2 (OLED off)\033[0m\n"));
-					vgm064032a1w01_enter_sleep();
-					osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+			pmsg(("\033[40;35mS1 (rtc+gsen+ble+oled)\033[0m\n"));
+			if (pwmgr_saving_timer()) {
+				vgm064032a1w01_enter_sleep();
+				osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
 
-					osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
-					pwmgr = PWMGR_S2;
-				}
+//				osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
+//				pwmgr_state_change(PWMGR_S2, 0);
+				pwmgr_state_change(PWMGR_S3, TIME_GSEN_OFF);
 			}
 			break;
 
 		case PWMGR_S2:
+			pmsg(("\033[40;35mS2 (rtc+gsen+ble)\033[0m\n"));
 			if (gapProfileState == GAPROLE_WAITING) {
-					dmsg(("\033[40;35mS3 (BLE off)\033[0m\n"));
+				// enable key interrupt mode
+				InitBoard(OB_READY);
 
-					// enable key interrupt mode
-					InitBoard(OB_READY);
-
-					pwmgr = PWMGR_S3;
+//				osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
+				pwmgr_state_change(PWMGR_S3, TIME_GSEN_OFF);
 			}
 			break;
 
 		case PWMGR_S3:
-//			dmsg(("\033[40;35mS3 ()\033[0m\n"));
-//			pwmgr = PWMGR_S4;
-			dmsg(("$%02x", osal_timer_num_active()));
+			pmsg(("\033[40;35mS3 (rtc+gsen)\033[0m\n"));
+			if (steps == normal.steps) {
+				if (pwmgr_saving_timer()) {
+					adxl345_enter_sleep();
+					pwmgr_state_change(PWMGR_S4, 0);
+				}
+			} else {
+				steps = normal.steps;
+				pwmgr_state_change(pwmgr, TIME_GSEN_OFF);
+			}
 			break;
 
 		case PWMGR_S4:
-			dmsg(("%"));
+			pmsg(("\033[40;35mS4 (rtc)\033[0m\n"));
+			dmsg(("$"));
 			break;
 
 		default:
+		case PWMGR_S5:
+			pmsg(("\033[40;35mS5 (shutdown)\033[0m\n"));
+			adxl345_shutdown();
+			osal_stop_timerEx(sensorTag_TaskID, EVT_RTC);
+			break;
+
+		case PWMGR_S6:
+			pmsg(("\033[40;35mS6 (rtc+oled\033[0m\n"));
+			if (pwmgr_saving_timer()) {
+				vgm064032a1w01_enter_sleep();
+				osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+				osal_stop_timerEx(sensorTag_TaskID, EVT_RTC);
+
+				// enable key interrupt mode
+				InitBoard(OB_READY);
+
+				pwmgr_state_change(PWMGR_S5, 0);
+			}
 			break;
 		}
 
-		if (pwmgr != PWMGR_S4) {
+		// battery measure
+		if (!batt_measure()) {
+			pwmgr_state_change(PWMGR_S5, 0);
+		}
+
+		// reload RTC timer
+		if (pwmgr != PWMGR_S5)  {
 			osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 		}
 		return (events ^ EVT_RTC);
 	}
 
 
-	//////////////
-	// g-sensor //
-	//////////////
-	if (events & EVT_GSENSOR) {
-		if (sensorTag_BattMeasure()) {
-//			dmsg(("."));
+	///////////////////////////////////////////////////////////////////////
+	// discard unknown events                                            //
+	///////////////////////////////////////////////////////////////////////
 
-			if (!adxl345_read(acc)) {
-				pedometer(acc);
-
-				normal.distance  =  (steps_normal * pi.stride) / 100UL;
-				workout.distance = ((steps_normal - steps_workout) * pi.stride) / 100UL;
-				normal.calorie   = (unsigned short) ((float) (normal.distance  / 1000UL * pi.weight) * 1.036);
-				workout.calorie  = (unsigned short) ((float) (workout.distance / 1000UL * pi.weight) * 1.036);
-
-				osal_start_timerEx(sensorTag_TaskID, EVT_GSENSOR, gsen_period);
-			}
-		}
-		return (events ^ EVT_GSENSOR);
-	}
-
-	// discard unknown events
 	return 0;
-}
-
-
-/**
- * @fn
- *
- * @brief
- *
- * @param
- *
- * @return
- */
-void custom_enter_sleep(void)
-{
-	vgm064032a1w01_enter_sleep();
-	adxl345_enter_sleep();
-
-}
-
-void custom_exit_sleep(void)
-{
-	vgm064032a1w01_exit_sleep();
-	adxl345_exit_sleep();
-
 }
 
 

@@ -45,10 +45,19 @@
 #include "hal_acc.h"
 #include "hal_mag.h"
 #include "hal_i2c.h"
-/***************************************************************************************************
-*                                    INTERRUPT SERVICE ROUTINE
-***************************************************************************************************/
 
+
+extern void	adxl345_int1_isr(void);
+extern void	adxl345_int2_isr(void);
+extern void	batt_isr(void);
+
+/*
+ ******************************************************************************
+ *
+ * INTERRUPT SERVICE ROUTINE
+ *
+ ******************************************************************************
+ */
 HAL_ISR_FUNCTION(halKeyPort0Isr, P0INT_VECTOR)
 {
 
@@ -56,15 +65,20 @@ HAL_ISR_FUNCTION(halKeyPort0Isr, P0INT_VECTOR)
 	if (HAL_KEY_SW_1_PXIFG & HAL_KEY_SW_1_BIT) {
 		halProcessKeyInterrupt();
 	}
+//	if (HAL_KEY_SW_2_PXIFG & HAL_KEY_SW_2_BIT) {
+//
+//	}
+//	if (HAL_KEY_SW_3_PXIFG & HAL_KEY_SW_3_BIT) {
+//
+//	}
 
-	if (HAL_KEY_SW_2_PXIFG & HAL_KEY_SW_2_BIT) {
-
+	if (GSINT_PXIFG & GSINT1_BV) {
+		adxl345_int1_isr();
+	}
+	if (GSINT_PXIFG & GSINT2_BV) {
+		adxl345_int2_isr();
 	}
 
-	if (HAL_KEY_SW_3_PXIFG & HAL_KEY_SW_3_BIT) {
-
-	}
-	
 #ifdef POWER_SAVING
 	CLEAR_SLEEP_MODE();
 #endif
@@ -78,17 +92,23 @@ HAL_ISR_FUNCTION(halKeyPort0Isr, P0INT_VECTOR)
 }
 
 
-/**************************************************************************************************
-* @fn      halKeyPort1Isr
-*
-* @brief   Port1 ISR
-**************************************************************************************************/
+/*
+ ******************************************************************************
+ * @fn      halKeyPort1Isr
+ *
+ * @brief   Port1 ISR
+ ******************************************************************************
+ */
 HAL_ISR_FUNCTION(halKeyPort1Isr, P1INT_VECTOR)
 {
 	HAL_ENTER_ISR();
 //	if ((HAL_KEY_SW_2_PXIFG & HAL_KEY_SW_2_BIT) || (HAL_KEY_SW_3_PXIFG & HAL_KEY_SW_3_BIT)) {
 //	    halProcessKeyInterrupt();
 //	}
+
+	if (BATCD_PXIFG & BATCD_BV) {
+		batt_isr();
+	}
 
 #ifdef POWER_SAVING
 	CLEAR_SLEEP_MODE();
@@ -97,20 +117,19 @@ HAL_ISR_FUNCTION(halKeyPort1Isr, P1INT_VECTOR)
 	 * Clear the CPU interrupt flag for Port_1
 	 * PxIFG has to be cleared before PxIF
 	 */
-//	HAL_KEY_SW_2_PXIFG = 0;
-//	HAL_KEY_SW_3_PXIFG = 0;
 	P1IFG = 0;
 	P1IF  = 0;
 	HAL_EXIT_ISR();
 }
 
 
-/**************************************************************************************************
-* @fn      halKeyPort2Isr
-*
-* @brief   Port2 ISR
-**************************************************************************************************/
-
+/*
+ ******************************************************************************
+ * @fn      halKeyPort2Isr
+ *
+ * @brief   Port2 ISR
+ ******************************************************************************
+ */
 HAL_ISR_FUNCTION(halI2CIsr, I2C_VECTOR)
 {
 	HAL_ENTER_ISR();

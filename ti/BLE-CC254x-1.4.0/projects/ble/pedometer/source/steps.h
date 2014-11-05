@@ -1,6 +1,6 @@
 /*
  ******************************************************************************
- * pedometer.h -
+ * steps.h -
  *
  * Copyright (c) 2014-2016 by ZealTek Electronic Co., Ltd.
  *
@@ -22,16 +22,12 @@
  ******************************************************************************
  */
 
-#ifndef __PEDOMETER_H__
-#define __PEDOMETER_H__
+#ifndef __STEPS_H__
+#define __STEPS_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-
-extern unsigned long	steps_normal;
-extern unsigned long	steps_workout;
 
 
 /*
@@ -39,11 +35,11 @@ extern unsigned long	steps_workout;
  * Functions
  ******************************************************************************
  */
-extern void	pedometer(unsigned short *buf);
+extern unsigned long	algo_step(unsigned short *buf);
 
 
 
 #ifdef __cplusplus
 };
 #endif
-#endif /* __PEDOMETER_H__ */
+#endif /* __STEPS_H__ */

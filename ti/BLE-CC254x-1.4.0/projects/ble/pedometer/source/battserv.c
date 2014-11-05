@@ -108,7 +108,7 @@ static CONST gattAttrType_t	battService = { ATT_BT_UUID_SIZE, battServUUID };
 
 // Battery level characteristic
 static uint8			battLevelProps = GATT_PROP_READ | GATT_PROP_NOTIFY;
-static uint8			battLevel = 90;
+static uint8			battLevel = 60;
 static gattCharCfg_t		battLevelClientCharCfg[GATT_MAX_NUM_CONN];
 
 

@@ -1,6 +1,6 @@
 /*
  ******************************************************************************
- * pedometer.h -
+ * steps.c -
  *
  * Copyright (c) 2014-2016 by ZealTek Electronic Co., Ltd.
  *
@@ -22,7 +22,7 @@
  ******************************************************************************
  */
 
-#include "pedometer.h"
+#include "steps.h"
 
 
 /*
@@ -86,16 +86,12 @@ static unsigned char	_bad_flag[3]  = {0, 0, 0};		// bad flag for peak-to-peak va
 static unsigned short	_threshold[3] = {0, 0, 0};		// dynamic threshold
 static unsigned short	_precision[3] = {24, 24, 24};		// dynamic precision
 
-
 static unsigned short	_sample_old[3] = {0, 0, 0};		// old fixed value
 static unsigned short	_sample_new[3] = {0, 0, 0};		// new fixed value
 
 unsigned long		STEPS = 0;				// new steps
-unsigned long		steps_normal  = 0;
-unsigned long		steps_workout = 0;
 
 static unsigned char	samples = 0;				// record the sample times
-
 
 static unsigned char	interval     = 0;			// Record the interval of a Step
 static unsigned char	TempSteps    = 0;			// Record the Temp Steps
@@ -120,7 +116,7 @@ static unsigned char	ReReg        = 2;			// Flag for Rule
 static void time_window(char n)
 {
 	
-	twmsg(("\033[1;36m(%s) ", __FUNCTION__));
+	twmsg(("\033[1;36m[twin] "));
 	switch (n) {
 	case 0:	twmsg(("x: "));	break;
 	case 1:	twmsg(("y: "));	break;
@@ -219,11 +215,9 @@ static void time_window(char n)
  ******************************************************************************
  */
 /*
- *
- * true binary code
- *
+ * step algorithm
  */
-void pedometer(unsigned short *buf)
+unsigned long algo_step(unsigned short *buf)
 {
 	unsigned char	i;
 
@@ -287,14 +281,14 @@ void pedometer(unsigned short *buf)
 				_bad_flag[i]  = 1;
 			}
 		}
-		for (i=X_CHANNEL; i<=Z_CHANNEL; i++) {
+		/*for (i=X_CHANNEL; i<=Z_CHANNEL; i++) {
 			switch (i) {
 			case X_CHANNEL:	dmsg(("x: "));	break;
 			case Y_CHANNEL:	dmsg(("y: "));	break;
 			case Z_CHANNEL:	dmsg(("z: "));	break;
 			}
 			dmsg(("vpp=%05d, dt=%05d, dp=%05d, badfg=%02d\n", _vpp[i], _threshold[i], _precision[i], _bad_flag[i]));
-		}
+		}*/
 	}
 
 	/* Linear Shift Register */
@@ -342,9 +336,6 @@ void pedometer(unsigned short *buf)
 		}
 	}
 
-	if (steps_normal != STEPS) {
-		twmsg(("\033[1;33mstep=%0lu\n\033[0m", STEPS));
-	}
-	steps_normal = STEPS;
+	return STEPS;
 }
 

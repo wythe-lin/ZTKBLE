@@ -101,12 +101,12 @@ extern "C" {
 #define XL345_INACT_X_DISABLE		0x00
 #define XL345_INACT_AC			0x08
 #define XL345_INACT_DC			0x00
-#define XL345_ACT_Z_ENABLE		0x10
-#define XL345_ACT_Z_DISABLE		0x00
-#define XL345_ACT_Y_ENABLE		0x20
-#define XL345_ACT_Y_DISABLE		0x00
-#define XL345_ACT_X_ENABLE		0x40
-#define XL345_ACT_X_DISABLE		0x00
+#define XL345_ACT_Z_ENB			0x10
+#define XL345_ACT_Z_DIS			0x00
+#define XL345_ACT_Y_ENB			0x20
+#define XL345_ACT_Y_DIS			0x00
+#define XL345_ACT_X_ENB			0x40
+#define XL345_ACT_X_DIS			0x00
 #define XL345_ACT_AC			0x80
 #define XL345_ACT_DC			0x00
 
@@ -241,12 +241,24 @@ extern "C" {
  * Functions
  ******************************************************************************
  */
-extern char		adxl345_init(void);
-extern char		adxl345_read(unsigned short *p);
+extern void		adxl345_softrst(void);
+extern void		adxl345_activity(unsigned char threshold);
+extern void		adxl345_sampling(unsigned char rate);
+
 extern void		adxl345_enter_sleep(void);
 extern void		adxl345_exit_sleep(void);
+extern void		adxl345_shutdown(void);
+
+extern char		adxl345_chk_dev(void);
+extern unsigned char	adxl345_chk_fifo(void);
+
+extern void		adxl345_read(unsigned short *p);
+
+extern void		adxl345_int1_isr(void);
+extern void		adxl345_int2_isr(void);
 
 extern void		adxl345_self_calibration(void);
+
 
 
 #ifdef __cplusplus

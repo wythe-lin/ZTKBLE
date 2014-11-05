@@ -45,28 +45,29 @@ extern "C"
 {
 #endif
 
+/*
+ ******************************************************************************
+ * Includes
+ ******************************************************************************
+ */
 #include "OSAL_Clock.h"
 
 
-/*********************************************************************
- * INCLUDES
+/*
+ ******************************************************************************
+ * Constants
+ ******************************************************************************
  */
-
-/*********************************************************************
- * CONSTANTS
- */
-
 // Sensor Tag Task Events
 #define EVT_START_DEVICE			0x0001
 #define EVT_SYSRST				0x0002
 #define EVT_MODE				0x0004
 #define EVT_SLEEP				0x0008
 #define EVT_RTC					0x0010
-
-#define EVT_GSENSOR				0x0100
-#define EVT_DISP				0x0200
-#define EVT_PWMGR				0x0400
-
+#define EVT_GSNINT1				0x0020
+#define EVT_GSNINT2				0x0040
+#define EVT_GSENSOR				0x0080
+#define EVT_DISP				0x0100
 
 #define MODE_NORMAL				0x00
 #define MODE_WORKOUT				0x10
@@ -135,20 +136,36 @@ struct sport_info {
 };
 
 typedef enum {
-	PWMGR_S0 = 0,		// full run
-	PWMGR_S1,		// oled screen saving
-	PWMGR_S2,		// g-sensor active only
-	PWMGR_S3,		// CPU halt
-	PWMGR_S4,		// CPU halt
+	PWMGR_S0 = 0,		// power on
+	PWMGR_S1,		// full run
+	PWMGR_S2,		// OLED off
+	PWMGR_S3,		// BLE off
+	PWMGR_S4,		// G-sensor off
+	PWMGR_S5,		// RTC off
+	PWMGR_S6		// display battery empty
 } pwmgr_t;
 
 
-/*********************************************************************
- * MACROS
+/*
+ ******************************************************************************
+ * Macros
+ ******************************************************************************
  */
 
-/*********************************************************************
- * FUNCTIONS
+
+
+/*
+ ******************************************************************************
+ * Variables
+ ******************************************************************************
+ */
+extern uint8	sensorTag_TaskID;
+
+
+/*
+ ******************************************************************************
+ * Functions
+ ******************************************************************************
  */
 /* Task Initialization for the BLE Application */
 extern void	SensorTag_Init(uint8 task_id);
@@ -157,11 +174,8 @@ extern void	SensorTag_Init(uint8 task_id);
 extern uint16	SensorTag_ProcessEvent(uint8 task_id, uint16 events);
 
 /* Power on self test */
-extern uint16	sensorTag_test(void);
+//extern uint16	sensorTag_test(void);
 
-
-/*********************************************************************
-*********************************************************************/
 
 #ifdef __cplusplus
 }
