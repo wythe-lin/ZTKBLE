@@ -222,9 +222,9 @@ typedef struct {
 	unsigned char	alarm2[5];
 	unsigned char	alarm3[5];
 	unsigned char	alarm4[5];
-	unsigned char	alarmIdle[6];
-	unsigned char	alarmActivity[7];
-	unsigned char	alarmOthers[14];
+	unsigned char	idle[6];
+	unsigned char	activity[7];
+	unsigned char	others[14];
 	unsigned char	chksum;
 } pt_set_personal_info_req_t;
 
@@ -427,7 +427,7 @@ typedef union {
 } pt_rsp_t;
 
 
-// 
+// packet format
 typedef union {
 	unsigned char	buf[200];	/* max size */
 
@@ -436,6 +436,8 @@ typedef union {
 	pt_req_t	req;
 	pt_rsp_t	rsp;
 } pt_t;
+
+
 
 
 /*

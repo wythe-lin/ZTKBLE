@@ -208,6 +208,10 @@ void adxl345_shutdown(void)
 	adxl345_activity(0);
 }
 
+
+/*
+ *
+ */
 char adxl345_chk_dev(void)
 {
 	unsigned char	devid;

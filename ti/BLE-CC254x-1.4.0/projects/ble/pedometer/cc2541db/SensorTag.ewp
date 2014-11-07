@@ -281,7 +281,8 @@
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
           <state>POWER_SAVING</state>
-          <state>PM_TEST</state>
+          <state>GAPBONDMGR_NO_SUPPORT</state>
+          <state>GAPROLE_ADVCHAN=39</state>
           <state>HAL_AES_DMA=TRUE</state>
           <state>HAL_DMA=TRUE</state>
           <state>HAL_LCD=FALSE</state>
@@ -1368,13 +1369,16 @@
           <state>INT_HEAP_LEN=3072</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
+          <state>POWER_SAVING</state>
+          <state>GAPBONDMGR_NO_SUPPORT</state>
+          <state>GAPROLE_ADVCHAN=39</state>
           <state>HAL_AES_DMA=TRUE</state>
           <state>HAL_DMA=TRUE</state>
-          <state>POWER_SAVING</state>
           <state>HAL_LCD=FALSE</state>
           <state>HAL_LED=TRUE</state>
           <state>HAL_I2C=TRUE</state>
           <state>HAL_ADC=TRUE</state>
+          <state>HAL_SLEEP_DEBUG_LED</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -2456,13 +2460,16 @@
           <state>INT_HEAP_LEN=3072</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
+          <state>POWER_SAVING</state>
+          <state>GAPBONDMGR_NO_SUPPORT</state>
+          <state>GAPROLE_ADVCHAN=39</state>
           <state>HAL_AES_DMA=TRUE</state>
           <state>HAL_DMA=TRUE</state>
-          <state>POWER_SAVING</state>
           <state>HAL_LCD=FALSE</state>
           <state>HAL_LED=TRUE</state>
           <state>HAL_I2C=TRUE</state>
           <state>HAL_ADC=TRUE</state>
+          <state>HAL_SLEEP_DEBUG_LED</state>
         </option>
         <option>
           <name>CCPreprocFile</name>
@@ -3271,6 +3278,9 @@
       <name>$PROJ_DIR$\..\source\fonts.c</name>
     </file>
     <file>
+      <name>$PROJ_DIR$\..\source\oled.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\source\OSAL_SensorTag.c</name>
     </file>
     <file>
@@ -3290,9 +3300,6 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\source\uart.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\source\vgm064032a1w01.c</name>
     </file>
   </group>
   <group>
@@ -3356,16 +3363,10 @@
           <name>$PROJ_DIR$\..\..\..\..\components\hal\target\CC2541ST\hal_adc.c</name>
         </file>
         <file>
-          <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2541ST\hal_aes.c</name>
+          <name>$PROJ_DIR$\..\..\..\..\components\hal\target\CC2541ST\hal_crc.c</name>
         </file>
         <file>
-          <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2541ST\hal_assert.c</name>
-        </file>
-        <file>
-          <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2541ST\hal_crc.c</name>
-        </file>
-        <file>
-          <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2541ST\hal_dma.c</name>
+          <name>$PROJ_DIR$\..\..\..\..\components\hal\target\CC2541ST\hal_dma.c</name>
         </file>
         <file>
           <name>$PROJ_DIR$\..\..\..\..\Components\hal\target\CC2541ST\hal_flash.c</name>
@@ -3457,7 +3458,7 @@
       <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_PwrMgr.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\..\..\Components\osal\mcu\cc2540\osal_snv.c</name>
+      <name>$PROJ_DIR$\..\..\..\..\components\osal\mcu\cc2540\osal_snv.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL_Timers.c</name>
@@ -3475,13 +3476,7 @@
       <name>$PROJ_DIR$\..\..\Profiles\Roles\gap.c</name>
     </file>
     <file>
-      <name>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.c</name>
-    </file>
-    <file>
       <name>$PROJ_DIR$\..\..\..\..\Components\ble\host\gatt_uuid.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\source\kxti9-1001.c</name>
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.c</name>

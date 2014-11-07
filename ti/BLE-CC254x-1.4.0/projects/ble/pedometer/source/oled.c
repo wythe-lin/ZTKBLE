@@ -1,6 +1,6 @@
 /*
  ******************************************************************************
- * vgm064032a1w01.c -  driver for OLED display based on the SSD1306 controller
+ * oled.c -  driver for OLED display based on the SSD1306 controller
  *
  * Copyright (c) 2014-2016 by ZealTek Electronic Co., Ltd.
  *
@@ -21,11 +21,14 @@
  *
  ******************************************************************************
  */
-
+#include <hal_board.h>
 #include <hal_i2c.h>
+#include <osal.h>
+
 #include "ssd1306.h"
-#include "vgm064032a1w01.h"
+#include "oled.h"
 #include "fonts.h"
+#include "sensorTag.h"
 
 static unsigned char		x, y;
 
@@ -37,7 +40,7 @@ static unsigned char		x, y;
  *
  ******************************************************************************
  */
-void vgm064032a1w01_init(void)
+void oled_init(void)
 {
 	ssd1306_command(0xAE);		// set display off
 
@@ -87,38 +90,36 @@ void vgm064032a1w01_init(void)
 	// initial variable
 	x    = 0;
 	y    = 0;
-	vgm064032a1w01_set_font(&fonts7x8);
+	oled_set_font(&fonts7x8);
 }
 
-void vgm064032a1w01_enter_sleep(void)
-{
-	// charge pump
-	ssd1306_command(0x8D);		// charge pump setting
-	ssd1306_command(0x10);
 
-	ssd1306_command(0xAE);		// set display off
+/*
+ *
+ */
+void oled_clr_screen(void)
+{
+	char	row, col, k;
+
+	k = OLED_HEIGHT / 8;
+	for (row=0; row<k; row++) {
+		ssd1306_set_pagecol(row, 32);
+		for (col=0; col<OLED_WIDTH; col++) {
+			ssd1306_data(0x00);
+		}
+	}
 }
 
-void vgm064032a1w01_exit_sleep(void)
-{
-	// charge pump
-	ssd1306_command(0x8D);		// charge pump setting
-	ssd1306_command(0x14);
 
-	ssd1306_command(0xAF);		// set display on
-}
-
-void vgm064032a1w01_set_font(const struct font_def *f)
+/*
+ *
+ */
+unsigned char oled_gotoxy(unsigned char row, unsigned char col)
 {
-	font = f;
-}
-
-unsigned char vgm064032a1w01_gotoxy(unsigned char row, unsigned char col)
-{
-	if (row > (VGM064032A1W01_HEIGHT / font->height)) {
+	if (row > (OLED_HEIGHT / font->height)) {
 		return 0;
 	}
-	if (col > (VGM064032A1W01_WIDTH / font->width)) {
+	if (col > (OLED_WIDTH / font->width)) {
 		return 0;
 	}
 	y = row;
@@ -127,7 +128,49 @@ unsigned char vgm064032a1w01_gotoxy(unsigned char row, unsigned char col)
 	return 1;
 }
 
-void vgm064032a1w01_putc(char c)
+
+/*
+ *
+ *
+ */
+void oled_enter_sleep(void)
+{
+	if (BATCD_SBIT) {
+		// charge pump
+		ssd1306_command(0x8D);		// charge pump setting
+		ssd1306_command(0x10);
+
+		ssd1306_command(0xAE);		// set display off
+
+		osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+	} else {
+		oled_clr_screen();
+	}
+}
+
+void oled_exit_sleep(void)
+{
+	// charge pump
+	ssd1306_command(0x8D);		// charge pump setting
+	ssd1306_command(0x14);
+
+	ssd1306_command(0xAF);		// set display on
+
+	oled_clr_screen();
+	osal_set_event(sensorTag_TaskID, EVT_DISP);
+}
+
+
+/*
+ *
+ */
+void oled_set_font(const struct font_def *f)
+{
+	font = f;
+}
+
+
+void oled_putc(char c)
 {
 	unsigned char		i;
 	unsigned short		base;
@@ -144,28 +187,15 @@ void vgm064032a1w01_putc(char c)
 	}
 }
 
-void vgm064032a1w01_puts(char *s)
+void oled_puts(char *s)
 {
 	while (*s) {
-		vgm064032a1w01_putc(*s);
+		oled_putc(*s);
 		s++;
 	}
 }
 
-void vgm064032a1w01_clr_screen(void)
-{
-	char	row, col, k;
-
-	k = VGM064032A1W01_HEIGHT / 8;
-	for (row=0; row<k; row++) {
-		ssd1306_set_pagecol(row, 32);
-		for (col=0; col<VGM064032A1W01_WIDTH; col++) {
-			ssd1306_data(0x00);
-		}
-	}
-}
-
-void vgm064032a1w01_puts_04x(unsigned short n)
+void oled_puts_04x(unsigned short n)
 {
 	unsigned char	tmp[4];
 
@@ -173,13 +203,13 @@ void vgm064032a1w01_puts_04x(unsigned short n)
 	tmp[1] = (n >>  4) & 0x000F;
 	tmp[2] = (n >>  8) & 0x000F;
 	tmp[3] = (n >> 12) & 0x000F;
-	if (tmp[3] < 10) { vgm064032a1w01_putc(tmp[3]+0x30); } else { vgm064032a1w01_putc(tmp[3]+0x61-10); }
-	if (tmp[2] < 10) { vgm064032a1w01_putc(tmp[2]+0x30); } else { vgm064032a1w01_putc(tmp[2]+0x61-10); }
-	if (tmp[1] < 10) { vgm064032a1w01_putc(tmp[1]+0x30); } else { vgm064032a1w01_putc(tmp[1]+0x61-10); }
-	if (tmp[0] < 10) { vgm064032a1w01_putc(tmp[0]+0x30); } else { vgm064032a1w01_putc(tmp[0]+0x61-10); }
+	if (tmp[3] < 10) { oled_putc(tmp[3]+0x30); } else { oled_putc(tmp[3]+0x61-10); }
+	if (tmp[2] < 10) { oled_putc(tmp[2]+0x30); } else { oled_putc(tmp[2]+0x61-10); }
+	if (tmp[1] < 10) { oled_putc(tmp[1]+0x30); } else { oled_putc(tmp[1]+0x61-10); }
+	if (tmp[0] < 10) { oled_putc(tmp[0]+0x30); } else { oled_putc(tmp[0]+0x61-10); }
 }
 
-void vgm064032a1w01_puts_05u(unsigned short n)
+void oled_puts_05u(unsigned short n)
 {
 	unsigned char	tmp[5];
 
@@ -196,15 +226,15 @@ void vgm064032a1w01_puts_05u(unsigned short n)
 	n      = n / 10;
 
 	tmp[4] = n;
-	vgm064032a1w01_putc(tmp[4]+0x30);
-	vgm064032a1w01_putc(tmp[3]+0x30);
-	vgm064032a1w01_putc(tmp[2]+0x30);
-	vgm064032a1w01_putc(tmp[1]+0x30);
-	vgm064032a1w01_putc(tmp[0]+0x30);
+	oled_putc(tmp[4]+0x30);
+	oled_putc(tmp[3]+0x30);
+	oled_putc(tmp[2]+0x30);
+	oled_putc(tmp[1]+0x30);
+	oled_putc(tmp[0]+0x30);
 }
 
 
-void vgm064032a1w01_draw_icon(unsigned char row, unsigned char col, unsigned char idx)
+void oled_draw_icon(unsigned char row, unsigned char col, unsigned char idx)
 {
 	unsigned char		i, k;
 	const unsigned char	*p;
@@ -219,7 +249,7 @@ void vgm064032a1w01_draw_icon(unsigned char row, unsigned char col, unsigned cha
 	}
 }
 
-void vgm064032a1w01_draw_num(unsigned char row, unsigned char col, unsigned short n)
+void oled_draw_num(unsigned char row, unsigned char col, unsigned short n)
 {
 	unsigned char	offset;
 	unsigned char	tmp[5];
@@ -237,16 +267,16 @@ void vgm064032a1w01_draw_num(unsigned char row, unsigned char col, unsigned shor
 
 	offset = 0;
 	if (tmp[4] != 0) {
-		vgm064032a1w01_draw_icon(row, col + location[offset++], tmp[4]);
+		oled_draw_icon(row, col + location[offset++], tmp[4]);
 	}
 	if ((tmp[4] | tmp[3]) != 0) {
-		vgm064032a1w01_draw_icon(row, col + location[offset++], tmp[3]);
+		oled_draw_icon(row, col + location[offset++], tmp[3]);
 	}
 	if ((tmp[4] | tmp[3] | tmp[2]) != 0) {
-		vgm064032a1w01_draw_icon(row, col + location[offset++], tmp[2]);
+		oled_draw_icon(row, col + location[offset++], tmp[2]);
 	}
 	if ((tmp[4] | tmp[3] | tmp[2] | tmp[1]) != 0) {
-		vgm064032a1w01_draw_icon(row, col + location[offset++], tmp[1]);
+		oled_draw_icon(row, col + location[offset++], tmp[1]);
 	}
-	vgm064032a1w01_draw_icon(row, col + location[offset], tmp[0]);
+	oled_draw_icon(row, col + location[offset], tmp[0]);
 }

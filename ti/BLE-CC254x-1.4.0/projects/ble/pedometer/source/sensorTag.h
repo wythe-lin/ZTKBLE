@@ -68,6 +68,7 @@ extern "C"
 #define EVT_GSNINT2				0x0040
 #define EVT_GSENSOR				0x0080
 #define EVT_DISP				0x0100
+#define EVT_CHARGING				0x0200
 
 #define MODE_NORMAL				0x00
 #define MODE_WORKOUT				0x10
@@ -80,6 +81,7 @@ extern "C"
 #define MODE_DBG				0x04
 
 
+
 struct pi_alarm {
 	unsigned char	enable;
 	unsigned char	hour;
@@ -88,7 +90,7 @@ struct pi_alarm {
 	unsigned char	repeat_week;
 };
 
-struct pi_alert {
+struct pi_activity {
 	unsigned char	enable;
 	unsigned char	type;
 	unsigned char	start_hour;
@@ -104,27 +106,13 @@ struct pi_others {
 	unsigned char	weight;			// unit: kg
 	unsigned char	stride;			// unit: cm
 	unsigned char	running_stride;		// unit: cm
-	unsigned char	sleep_start_hour;
-	unsigned char	sleep_start_minute;
-	unsigned char	wakeup_start_hour;
-	unsigned char	wakeup_start_minute;
-	unsigned char	goal_steps;
+	unsigned char	sleep_hour;
+	unsigned char	sleep_minute;
+	unsigned char	waleup_hour;
+	unsigned char	waleup_minute;
+	unsigned char	goal_steps[3];
 	unsigned char	bt_auto_close;
 	unsigned char	bt_auto_close_time;	// unit: minute
-};
-
-struct personal_info {
-	unsigned short		height;		// unit: cm
-	unsigned short		weight;		// unit: kg
-	unsigned short		stride;		// unit: cm - man = height x 0.415, woman = height x 0.413
-
-	struct pi_alarm		alarm1;
-	struct pi_alarm		alarm2;
-	struct pi_alarm		alarm3;
-	struct pi_alarm		alarm4;
-	struct pi_alert		idle;
-	struct pi_alert		activity;
-	struct pi_others	others;
 };
 
 struct sport_info {

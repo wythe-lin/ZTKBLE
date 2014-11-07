@@ -708,7 +708,15 @@ void GAPRole_Init( uint8 task_id )
   gapRole_signCounter = 0;
   gapRole_AdvEventType = GAP_ADTYPE_ADV_IND;
   gapRole_AdvDirectType = ADDRTYPE_PUBLIC;
-  gapRole_AdvChanMap = GAP_ADVCHAN_39/*GAP_ADVCHAN_ALL*/;
+#if   defined(GAPROLE_ADVCHAN) && (GAPROLE_ADVCHAN == 37)
+  gapRole_AdvChanMap = GAP_ADVCHAN_37;
+#elif defined(GAPROLE_ADVCHAN) && (GAPROLE_ADVCHAN == 38)
+  gapRole_AdvChanMap = GAP_ADVCHAN_38;
+#elif defined(GAPROLE_ADVCHAN) && (GAPROLE_ADVCHAN == 39)
+  gapRole_AdvChanMap = GAP_ADVCHAN_39;
+#else
+  gapRole_AdvChanMap = GAP_ADVCHAN_ALL;
+#endif
   gapRole_AdvFilterPolicy = GAP_FILTER_POLICY_ALL;
 
   // Restore Items from NV
@@ -1068,8 +1076,9 @@ static void gapRole_ProcessGAPMsg( gapEventHdr_t *pMsg )
           }
 
           // Notify the Bond Manager to the connection
+#if !defined(GAPBONDMGR_NO_SUPPORT)
           VOID GAPBondMgr_LinkEst( pPkt->devAddrType, pPkt->devAddr, pPkt->connectionHandle, GAP_PROFILE_PERIPHERAL );
-          
+#endif
           // Set enabler to FALSE; device will become discoverable again when
           // this value gets set to TRUE
           gapRole_AdvEnabled = FALSE;          
@@ -1095,7 +1104,9 @@ static void gapRole_ProcessGAPMsg( gapEventHdr_t *pMsg )
       {
         gapTerminateLinkEvent_t *pPkt = (gapTerminateLinkEvent_t *)pMsg;
 
+#if !defined(GAPBONDMGR_NO_SUPPORT)
         VOID GAPBondMgr_ProcessGAPMsg( (gapEventHdr_t *)pMsg );
+#endif
         osal_memset( gapRole_ConnectedDevAddr, 0, B_ADDR_LEN );
 
         // Erase connection information

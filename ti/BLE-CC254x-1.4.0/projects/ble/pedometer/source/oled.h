@@ -1,6 +1,6 @@
 /*
  ******************************************************************************
- * vgm064032a1w01.h -
+ * oled.h -
  *
  * Copyright (c) 2014-2016 by ZealTek Electronic Co., Ltd.
  *
@@ -22,8 +22,8 @@
  ******************************************************************************
  */
 
-#ifndef __VGM064032A1W01_H__
-#define __VGM064032A1W01_H__
+#ifndef __OLED_H__
+#define __OLED_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,30 +32,30 @@ extern "C" {
 #include "fonts.h"
 
 
-#define VGM064032A1W01_WIDTH		64
-#define VGM064032A1W01_HEIGHT		32
+#define OLED_WIDTH		64
+#define OLED_HEIGHT		32
 
 /*
  ******************************************************************************
  * Functions
  ******************************************************************************
  */
-extern void		vgm064032a1w01_init(void);
-extern void		vgm064032a1w01_enter_sleep(void);
-extern void		vgm064032a1w01_exit_sleep(void);
-extern void		vgm064032a1w01_set_font(const struct font_def *f);
-extern void		vgm064032a1w01_clr_screen(void);
-extern unsigned char	vgm064032a1w01_gotoxy(unsigned char row, unsigned char col);
-extern void		vgm064032a1w01_putc(char c);
-extern void		vgm064032a1w01_puts(char *s);
+extern void		oled_init(void);
+extern void		oled_enter_sleep(void);
+extern void		oled_exit_sleep(void);
+extern void		oled_set_font(const struct font_def *f);
+extern void		oled_clr_screen(void);
+extern unsigned char	oled_gotoxy(unsigned char row, unsigned char col);
+extern void		oled_putc(char c);
+extern void		oled_puts(char *s);
 
-extern void		vgm064032a1w01_puts_04x(unsigned short n);
-extern void		vgm064032a1w01_puts_05u(unsigned short n);
+extern void		oled_puts_04x(unsigned short n);
+extern void		oled_puts_05u(unsigned short n);
 
-extern void		vgm064032a1w01_draw_icon(unsigned char row, unsigned char col, unsigned char idx);
-extern void		vgm064032a1w01_draw_num(unsigned char row, unsigned char col, unsigned short n);
+extern void		oled_draw_icon(unsigned char row, unsigned char col, unsigned char idx);
+extern void		oled_draw_num(unsigned char row, unsigned char col, unsigned short n);
 
 #ifdef __cplusplus
 };
 #endif
-#endif /* __VGM064032A1W01_H__ */
+#endif /* __OLED_H__ */

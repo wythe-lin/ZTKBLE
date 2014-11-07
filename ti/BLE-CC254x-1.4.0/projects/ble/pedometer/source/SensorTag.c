@@ -44,31 +44,33 @@
  *
  *****************************************************************************
  */
-#include "bcomdef.h"
-#include "OSAL.h"
-#include "OSAL_PwrMgr.h"
-#include "OSAL_Clock.h"
+#include <bcomdef.h>
+#include <OSAL.h>
+#include <OSAL_PwrMgr.h>
+#include <OSAL_Clock.h>
+#include <OSAL_Memory.h>
+#include <osal_bufmgr.h>
 
-#include "OnBoard.h"
-#include "hal_drivers.h"
-#include "hal_adc.h"
-#include "hal_led.h"
-#include "hal_keys.h"
-#include "hal_i2c.h"
+#include <OnBoard.h>
+#include <hal_drivers.h>
+#include <hal_adc.h>
+#include <hal_led.h>
+#include <hal_keys.h>
+#include <hal_i2c.h>
 
-#include "gatt.h"
-#include "hci.h"
+#include <gatt.h>
+#include <hci.h>
 
-#include "gapgattserver.h"
-#include "gattservapp.h"
+#include <gapgattserver.h>
+#include <gattservapp.h>
 
-#include "peripheral.h"
+#include <peripheral.h>
 
-#include "gapbondmgr.h"
+#include <gapbondmgr.h>
 
 #if defined FEATURE_OAD
-  #include "oad.h"
-  #include "oad_target.h"
+  #include <oad.h>
+  #include <oad_target.h>
 #endif
 
 // Services
@@ -82,7 +84,7 @@
 #include "hal_sensor.h"
 
 #include "uart.h"
-#include "vgm064032a1w01.h"
+#include "oled.h"
 #include "fonts.h"
 //#include "kxti9-1001.h"
 #include "adxl345.h"
@@ -209,6 +211,7 @@
 #define PERIOD_SYSRST				(1000*8)	// system reset
 #define PERIOD_DISP				(1000/5)	// oled display
 #define PERIOD_RTC				(1000*1)	// real time clock
+#define PERIOD_CHARGE_DEBOUNCE			(1000/1)	// battery charge detect debounce
 
 #define TIME_PWRON				(1)		// power on
 #define TIME_OLED_OFF				(5)		// oled off
@@ -289,9 +292,9 @@ static uint8		advertData[] = {
 
 // GAP GATT Attributes
 #if defined(HAL_IMAGE_A)
-static uint8		attDeviceName[] = "Zealtek Pedometer A";
+static uint8		attDeviceName[] = "PT-5200";
 #elif defined(HAL_IMAGE_B)
-static uint8		attDeviceName[] = "Zealtek Pedometer B";
+static uint8		attDeviceName[] = "PT-5200";
 #else
 static uint8		attDeviceName[] = "PT-5200";
 #endif
@@ -309,20 +312,21 @@ static pwmgr_t		pwmgr;
 static unsigned char	power_saving;
 static unsigned long	steps;
 static unsigned char	batt_level;
-static unsigned char	batt_charging = 0;
 
 
-static struct personal_info 	pi = {
+static struct pi_others		pi = {
+	0,
 	170,					// unit: cm
 	65,					// unit: kg
-	(unsigned char) (170*0.415),		// unit: cm - man = weight x 0.415, woman = weight x 0.413
-	{ 0 },
-	{ 0 },
-	{ 0 },
-	{ 0 },
-	{ 0 },
-	{ 0 },
-	{ 0 },
+	(unsigned char) ((170*0.415) / 2),	// unit: cm - man = weight x 0.415, woman = weight x 0.413
+	(unsigned char) (170*0.415),		//
+	0,
+	0,
+	0,
+	0,
+	{ 0, 0, 0 },
+	0,
+	0,
 };
 
 static struct sport_info	normal = {
@@ -338,6 +342,8 @@ static struct sport_info	workout = {
 	0,
 	0,
 };
+
+static unsigned short		ptdb[7*24*(60/10)/2];
 
 
 /*
@@ -384,7 +390,6 @@ static unsigned char batt_measure(void)
 	HalAdcSetReference(HAL_ADC_REF_125V);
 	adc = HalAdcRead(HAL_ADC_CHANNEL_7, HAL_ADC_RESOLUTION_14);
 
-
 	if (!BATCD_SBIT) {
 		batt_level = 7;	// battery charge
 	} else if ((adc >= BATT_LEVEL_01)) {
@@ -402,7 +407,7 @@ static unsigned char batt_measure(void)
 	} else {
 		batt_level = 0;	// battery shutdown
 	}
-	battmsg(("adc=%04x, lv=%02x, ac=%02x\n", adc, batt_level, batt_charging));
+	battmsg(("adc=%04x, lv=%02x\n", adc, batt_level));
 	return batt_level;
 }
 
@@ -413,7 +418,7 @@ static unsigned char batt_get_level(void)
 
 void batt_isr(void)
 {
-	batt_charging = 1;
+	osal_start_timerEx(sensorTag_TaskID, EVT_CHARGING, PERIOD_CHARGE_DEBOUNCE);
 //	BATCD_PXIFG   = ~(BATCD_BV);
 }
 
@@ -471,9 +476,7 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 		key1_press = TRUE;
 
 		// display
-		vgm064032a1w01_exit_sleep();
-		vgm064032a1w01_clr_screen();
-		osal_set_event(sensorTag_TaskID, EVT_DISP);
+		oled_exit_sleep();
 
 		// KEY action
 		if (pwmgr == PWMGR_S1) {
@@ -513,7 +516,7 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 		// power management
 		switch (pwmgr) {
 		case PWMGR_S5:
-			osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+			osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 			pwmgr_state_change(PWMGR_S6, TIME_OLED_OFF);
 
 		case PWMGR_S6:
@@ -579,16 +582,16 @@ static void sensorTag_ProcessOSALMsg(osal_event_hdr_t *msg)
  */
 static void sensorTag_BattDisp(unsigned char level)
 {
-	vgm064032a1w01_set_font(&icon16x16);
+	oled_set_font(&icon16x16);
 	switch (level) {
 	case 7:	// battery charge
 		switch (charge_icon) {
-		case 0:	vgm064032a1w01_draw_icon(2, 44,  7);	break;
-		case 1:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
-		case 2:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
-		case 3:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
-		case 4:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
-		case 5:	vgm064032a1w01_draw_icon(2, 44, 12);	break;
+		case 0:	oled_draw_icon(2, 44,  7);	break;
+		case 1:	oled_draw_icon(2, 44,  8);	break;
+		case 2:	oled_draw_icon(2, 44,  9);	break;
+		case 3:	oled_draw_icon(2, 44, 10);	break;
+		case 4:	oled_draw_icon(2, 44, 11);	break;
+		case 5:	oled_draw_icon(2, 44, 12);	break;
 		}
 		if (charge_cnt < 3) {
 			charge_cnt++;
@@ -600,13 +603,13 @@ static void sensorTag_BattDisp(unsigned char level)
 		}
 		break;
 
-	case 6:	vgm064032a1w01_draw_icon(2, 44, 12);	break;	// battery full
-	case 5:	vgm064032a1w01_draw_icon(2, 44, 11);	break;
-	case 4:	vgm064032a1w01_draw_icon(2, 44, 10);	break;
-	case 3:	vgm064032a1w01_draw_icon(2, 44,  9);	break;
-	case 2:	vgm064032a1w01_draw_icon(2, 44,  8);	break;
-	case 1:	vgm064032a1w01_draw_icon(2, 44,  7);	break;	// battery empty
-	case 0:	vgm064032a1w01_draw_icon(2, 44, 13);	break;	// battery shutdown
+	case 6:	oled_draw_icon(2, 44, 12);	break;	// battery full
+	case 5:	oled_draw_icon(2, 44, 11);	break;
+	case 4:	oled_draw_icon(2, 44, 10);	break;
+	case 3:	oled_draw_icon(2, 44,  9);	break;
+	case 2:	oled_draw_icon(2, 44,  8);	break;
+	case 1:	oled_draw_icon(2, 44,  7);	break;	// battery empty
+	case 0:	oled_draw_icon(2, 44, 13);	break;	// battery shutdown
 	}
 }
 
@@ -624,20 +627,21 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 	VOID		*p;
 	UTCTimeStruct	time;
 
+
 	if ((mode & 0xF0) == MODE_SLEEP) {
 		// display time
 		sensorTag_ClockGet(&time, 0);
 
-		vgm064032a1w01_set_font(&num8x16);
-		vgm064032a1w01_draw_icon(1,  0, time.hour/10);
-		vgm064032a1w01_draw_icon(1,  8, time.hour%10);
-		vgm064032a1w01_draw_icon(1, 16, 10);
-		vgm064032a1w01_draw_icon(1, 24, time.minutes/10);
-		vgm064032a1w01_draw_icon(1, 32, time.minutes%10);
+		oled_set_font(&num8x16);
+		oled_draw_icon(1,  0, time.hour/10);
+		oled_draw_icon(1,  8, time.hour%10);
+		oled_draw_icon(1, 16, 10);
+		oled_draw_icon(1, 24, time.minutes/10);
+		oled_draw_icon(1, 32, time.minutes%10);
 
 		// display sleep icon
-		vgm064032a1w01_set_font(&icon16x16);
-		vgm064032a1w01_draw_icon(0, 44, 6);
+		oled_set_font(&icon16x16);
+		oled_draw_icon(0, 44, 6);
 
 		// display battery
 		sensorTag_BattDisp(batt_get_level());
@@ -650,30 +654,30 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 			// display time
 			sensorTag_ClockGet(&time, 0);
 
-			vgm064032a1w01_set_font(&num8x16);
-			vgm064032a1w01_draw_icon(1,  0, time.hour/10);
-			vgm064032a1w01_draw_icon(1,  8, time.hour%10);
-			vgm064032a1w01_draw_icon(1, 16, 10);
-			vgm064032a1w01_draw_icon(1, 24, time.minutes/10);
-			vgm064032a1w01_draw_icon(1, 32, time.minutes%10);
+			oled_set_font(&num8x16);
+			oled_draw_icon(1,  0, time.hour/10);
+			oled_draw_icon(1,  8, time.hour%10);
+			oled_draw_icon(1, 16, 10);
+			oled_draw_icon(1, 24, time.minutes/10);
+			oled_draw_icon(1, 32, time.minutes%10);
 
 			// display clock icon
-			vgm064032a1w01_set_font(&icon16x16);
-			vgm064032a1w01_draw_icon(0, 44, 14);
+			oled_set_font(&icon16x16);
+			oled_draw_icon(0, 44, 14);
 
 		} else {
 			// display chronograph
 			sensorTag_ClockGet(&time, workout.time);
 
-			vgm064032a1w01_set_font(&num8x16);
-			vgm064032a1w01_draw_icon(0,  0, time.hour/10);
-			vgm064032a1w01_draw_icon(0,  8, time.hour%10);
-			vgm064032a1w01_draw_icon(0, 16, 10);
-			vgm064032a1w01_draw_icon(0, 24, time.minutes/10);
-			vgm064032a1w01_draw_icon(0, 32, time.minutes%10);
-			vgm064032a1w01_draw_icon(0, 40, 10);
-			vgm064032a1w01_draw_icon(0, 48, time.seconds/10);
-			vgm064032a1w01_draw_icon(0, 56, time.seconds%10);
+			oled_set_font(&num8x16);
+			oled_draw_icon(0,  0, time.hour/10);
+			oled_draw_icon(0,  8, time.hour%10);
+			oled_draw_icon(0, 16, 10);
+			oled_draw_icon(0, 24, time.minutes/10);
+			oled_draw_icon(0, 32, time.minutes%10);
+			oled_draw_icon(0, 40, 10);
+			oled_draw_icon(0, 48, time.seconds/10);
+			oled_draw_icon(0, 56, time.seconds%10);
 		}
 		// display battery
 		sensorTag_BattDisp(batt_get_level());
@@ -681,80 +685,80 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 
 	case MODE_STEP:
 		// display step icon
-		vgm064032a1w01_set_font(&icon16x16);
+		oled_set_font(&icon16x16);
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_icon(0, 44, 0);
+			oled_draw_icon(0, 44, 0);
 		} else {
-			vgm064032a1w01_draw_icon(0, 44, 1);
+			oled_draw_icon(0, 44, 1);
 		}
 		// display step
-		vgm064032a1w01_set_font(&num8x16);
+		oled_set_font(&num8x16);
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_num(1, 0, normal.steps);
+			oled_draw_num(1, 0, normal.steps);
 		} else {
-			vgm064032a1w01_draw_num(1, 0, normal.steps - workout.steps);
+			oled_draw_num(1, 0, normal.steps - workout.steps);
 		}
 		break;
 
 	case MODE_CALORIE:
 		// display calorie icon
-		vgm064032a1w01_set_font(&icon16x16);
+		oled_set_font(&icon16x16);
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_icon(0, 44, 2);
+			oled_draw_icon(0, 44, 2);
 		} else {
-			vgm064032a1w01_draw_icon(0, 44, 3);
+			oled_draw_icon(0, 44, 3);
 		}
 		// display calorie
-		vgm064032a1w01_set_font(&num8x16);
+		oled_set_font(&num8x16);
 #if !defined(HAL_IMAGE_A)
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_num(1, 0, normal.calorie);
+			oled_draw_num(1, 0, normal.calorie);
 		} else {
-			vgm064032a1w01_draw_num(1, 0, workout.calorie);
+			oled_draw_num(1, 0, workout.calorie);
 		}
 #else
-		vgm064032a1w01_draw_icon(1, 0, 0);
+		oled_draw_icon(1, 0, 0);
 #endif
 		break;
 
 	case MODE_DISTANCE:
 		// display distance icon
-		vgm064032a1w01_set_font(&icon16x16);
+		oled_set_font(&icon16x16);
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_icon(0, 44, 4);
+			oled_draw_icon(0, 44, 4);
 		} else {
-			vgm064032a1w01_draw_icon(0, 44, 5);
+			oled_draw_icon(0, 44, 5);
 		}
 		// display distance
-		vgm064032a1w01_set_font(&num8x16);
+		oled_set_font(&num8x16);
 #if !defined(HAL_IMAGE_A)
 		if ((mode & 0xF0) == MODE_NORMAL) {
-			vgm064032a1w01_draw_num(1, 0, normal.distance);
+			oled_draw_num(1, 0, normal.distance);
 		} else {
-			vgm064032a1w01_draw_num(1, 0, workout.distance);
+			oled_draw_num(1, 0, workout.distance);
 		}
 #else
-		vgm064032a1w01_draw_icon(1, 0, 0);
+		oled_draw_icon(1, 0, 0);
 #endif
 		break;
 
 	case MODE_DBG:
-		vgm064032a1w01_set_font(&fonts7x8);
-		vgm064032a1w01_gotoxy(0, 0);
-		vgm064032a1w01_puts("x:");
-		vgm064032a1w01_puts_04x(acc[0]);
+		oled_set_font(&fonts7x8);
+		oled_gotoxy(0, 0);
+		oled_puts("x:");
+		oled_puts_04x(acc[0]);
 
-		vgm064032a1w01_gotoxy(1, 0);
-		vgm064032a1w01_puts("y:");
-		vgm064032a1w01_puts_04x(acc[1]);
+		oled_gotoxy(1, 0);
+		oled_puts("y:");
+		oled_puts_04x(acc[1]);
 
-		vgm064032a1w01_gotoxy(2, 0);
-		vgm064032a1w01_puts("z:");
-		vgm064032a1w01_puts_04x(acc[2]);
+		oled_gotoxy(2, 0);
+		oled_puts("z:");
+		oled_puts_04x(acc[2]);
 
-		vgm064032a1w01_gotoxy(3, 0);
-		vgm064032a1w01_puts("s:");
-		vgm064032a1w01_puts_05u(normal.steps);
+		oled_gotoxy(3, 0);
+		oled_puts("s:");
+		oled_puts_05u(normal.steps);
 		break;
 	}
 }
@@ -871,6 +875,9 @@ static char SensorTag_PktParsing(pt_t *pkt)
 	switch (pkt->id) {
 	case SET_PERSONAL_INFO_REQ:
 		chksum_recv = pkt->req.set_personal_info.chksum;
+		if (chksum_recv == chksum_calc) {
+			osal_memcpy(&pi, &pkt->req.set_personal_info.others[0], sizeof(struct pi_others));
+		}
 		pkt->rsp.set_personal_info_ok.id     = SET_PERSONAL_INFO_OK_RSP;
 		pkt->rsp.set_personal_info_ok.len    = 0x00;
 		pkt->rsp.set_personal_info_ok.chksum = 0x00;
@@ -909,11 +916,16 @@ static char SensorTag_PktParsing(pt_t *pkt)
 
 	case CLR_DATA_REQ:
 		chksum_recv = pkt->req.clear_data.chksum;
-		pkt->rsp.clr_data_ok.id     = CLR_DATA_OK_RSP;
-		pkt->rsp.clr_data_ok.len    = 0x00;
-		pkt->rsp.clr_data_ok.chksum = 0x00;
-		if (chksum_recv != chksum_calc) {
+		if (chksum_recv == chksum_calc) {
+			osal_memset(ptdb, 0xFF, sizeof(ptdb));
+
+			pkt->rsp.clr_data_ok.id     = CLR_DATA_OK_RSP;
+			pkt->rsp.clr_data_ok.len    = 0x00;
+			pkt->rsp.clr_data_ok.chksum = 0x00;
+		} else {
 			pkt->rsp.clr_data_ng.id = CLR_DATA_NG_RSP;
+			pkt->rsp.clr_data_ok.len    = 0x00;
+			pkt->rsp.clr_data_ok.chksum = 0x00;
 			btmsg(("IN: chksum fail! (r:%02x, c:%02x)\n", chksum_recv, chksum_calc));
 		}
 		break;
@@ -1031,10 +1043,12 @@ static gapRolesCBs_t	sensorTag_PeripheralCBs = {
 };
 
 // GAP Bond Manager Callbacks
+#if !defined(GAPBONDMGR_NO_SUPPORT)
 static gapBondCBs_t	sensorTag_BondMgrCBs = {
 	NULL,				// Passcode callback (not used by application)
 	NULL				// Pairing / Bonding state Callback (not used by application)
 };
+#endif
 
 // ProTrack Profile Callbacks
 static ptServ1CBs_t	ptServ1CBs = {
@@ -1109,6 +1123,7 @@ void SensorTag_Init(uint8 task_id)
 	}
 
 	// Setup the GAP Bond Manager
+#if !defined(GAPBONDMGR_NO_SUPPORT)
 	{
 		uint32	passkey  = 0;	// passkey "000000"
 		uint8	pairMode = GAPBOND_PAIRING_MODE_WAIT_FOR_REQ;
@@ -1122,6 +1137,7 @@ void SensorTag_Init(uint8 task_id)
 		GAPBondMgr_SetParameter(GAPBOND_IO_CAPABILITIES,  sizeof(uint8),  &ioCap);
 		GAPBondMgr_SetParameter(GAPBOND_BONDING_ENABLED,  sizeof(uint8),  &bonding);
 	}
+#endif
 
 	// Add services
 	GGS_AddService(GATT_ALL_SERVICES);		// GAP
@@ -1149,6 +1165,8 @@ void SensorTag_Init(uint8 task_id)
 
 	// Initialise sensor drivers
 //	kxti9_init();
+
+	osal_memset(ptdb, 0xFF, sizeof(ptdb));
 
 	// Register callbacks with profile
 	ptProfile_RegisterAppCBs(&ptServ1CBs);
@@ -1225,10 +1243,11 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		GAPRole_StartDevice(&sensorTag_PeripheralCBs);
 
 		// start bond manager
+#if !defined(GAPBONDMGR_NO_SUPPORT)
 		GAPBondMgr_Register(&sensorTag_BondMgrCBs);
-
+#endif
 		// start peripheral device
-		vgm064032a1w01_init();
+		oled_init();
 		adxl345_softrst();
 //		adxl345_self_calibration();
 
@@ -1236,7 +1255,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		BATCD_PXIFG  = ~(BATCD_BV);
 		BATCD_IEN   |=  BATCD_IENBIT;
 
-		osal_start_timerEx(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+		osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 		pwmgr_state_change(PWMGR_S0, 0);
 
 		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
@@ -1249,7 +1268,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_MODE) {
 		if (key1_press) {
-			vgm064032a1w01_clr_screen();
+			oled_clr_screen();
 			if ((opmode & 0xF0) == MODE_NORMAL) {
 				opmode        = MODE_WORKOUT | MODE_TIME;
 				workout.steps = normal.steps;
@@ -1267,7 +1286,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 
 	if (events & EVT_SLEEP) {
 		if (key1_press) {
-			vgm064032a1w01_clr_screen();
+			oled_clr_screen();
 			opmode = MODE_SLEEP;
 			fmsg(("\033[40;32m[sleep mode]\033[0m\n"));
 
@@ -1289,9 +1308,14 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	// display handle                                                    //
 	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_DISP) {
-		sensorTag_HandleDisp(opmode, acc);
+		if (pwmgr == PWMGR_S1) {
+			sensorTag_HandleDisp(opmode, acc);
+		} else {
+			// display battery only
+			sensorTag_BattDisp(batt_get_level());
+		}
 		if (pwmgr != PWMGR_S6)  {
-			osal_start_reload_timer(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
+			osal_start_timerEx(sensorTag_TaskID, EVT_DISP, PERIOD_DISP);
 		}
 		return (events ^ EVT_DISP);
 	}
@@ -1345,7 +1369,6 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_RTC) {
 		// performed once per second
 
-
 		// power management
 		switch (pwmgr) {
 		case PWMGR_S0:
@@ -1361,8 +1384,11 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		case PWMGR_S1:
 			pmsg(("\033[40;35mS1 (rtc+gsen+ble+oled)\033[0m\n"));
 			if (pwmgr_saving_timer()) {
-				vgm064032a1w01_enter_sleep();
-				osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
+				oled_enter_sleep();
+
+				osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
+//				osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
+//				osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
 
 //				osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
 //				pwmgr_state_change(PWMGR_S2, 0);
@@ -1407,30 +1433,43 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 			break;
 
 		case PWMGR_S6:
-			pmsg(("\033[40;35mS6 (rtc+oled\033[0m\n"));
+			pmsg(("\033[40;35mS6 (rtc+oled)\033[0m\n"));
 			if (pwmgr_saving_timer()) {
-				vgm064032a1w01_enter_sleep();
-				osal_stop_timerEx(sensorTag_TaskID, EVT_DISP);
-				osal_stop_timerEx(sensorTag_TaskID, EVT_RTC);
+				oled_enter_sleep();
 
 				// enable key interrupt mode
 				InitBoard(OB_READY);
-
 				pwmgr_state_change(PWMGR_S5, 0);
 			}
 			break;
 		}
 
 		// battery measure
-		if (!batt_measure()) {
+		if ((!batt_measure()) && (pwmgr != PWMGR_S6)) {
 			pwmgr_state_change(PWMGR_S5, 0);
 		}
-
-		// reload RTC timer
-		if (pwmgr != PWMGR_S5)  {
-			osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
-		}
 		return (events ^ EVT_RTC);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////
+	// battery charge detect handle                                      //
+	///////////////////////////////////////////////////////////////////////
+	if (events & EVT_CHARGING) {
+		if (pwmgr != PWMGR_S1) {
+			if (!BATCD_SBIT) {
+				battmsg(("charging...\n"));
+				oled_exit_sleep();
+				if ((pwmgr == PWMGR_S5) || (pwmgr == PWMGR_S6)) {
+					osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
+					pwmgr_state_change(PWMGR_S4, 0);
+				}
+			} else {
+				battmsg(("no charge...\n"));
+				oled_enter_sleep();
+			}
+		}
+		return (events ^ EVT_CHARGING);
 	}
 
 
