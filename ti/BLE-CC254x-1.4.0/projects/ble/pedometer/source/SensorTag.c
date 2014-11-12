@@ -65,12 +65,11 @@
 #include <gattservapp.h>
 
 #include <peripheral.h>
-
 #include <gapbondmgr.h>
 
-#if defined FEATURE_OAD
-  #include <oad.h>
-  #include <oad_target.h>
+#if defined(FEATURE_OAD)
+   #include <oad.h>
+   #include <oad_target.h>
 #endif
 
 // Services
@@ -86,10 +85,10 @@
 #include "uart.h"
 #include "oled.h"
 #include "fonts.h"
-//#include "kxti9-1001.h"
 #include "adxl345.h"
 
 #include "steps.h"
+#include "hash.h"
 
 /*
  *****************************************************************************
@@ -108,7 +107,7 @@
 
 #define DEBUG_MESSAGE		\
 (				\
-	MSG_BATT	|	\
+/*	MSG_BATT	|*/	\
 	MSG_STEPS	|	\
 	MSG_BLE		|	\
 	MSG_PWMGR	|	\
@@ -208,6 +207,7 @@
 // how often to perform something (milliseconds)
 #define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
 #define PERIOD_MODE_SLEEP			(1000*4)	// into sleep mode
+#define PERIOD_CALIB				(1000*6)	// g-sensor calibration
 #define PERIOD_SYSRST				(1000*8)	// system reset
 #define PERIOD_DISP				(1000/5)	// oled display
 #define PERIOD_RTC				(1000*1)	// real time clock
@@ -329,21 +329,9 @@ static struct pi_others		pi = {
 	0,
 };
 
-static struct sport_info	normal = {
-	0,
-	0,
-	0,
-	0,
-};
-
-static struct sport_info	workout = {
-	0,
-	0,
-	0,
-	0,
-};
-
-static unsigned short		ptdb[7*24*(60/10)/2];
+static sport_record_t		normal  = { 0, 0, 0, 0 };
+static sport_record_t		workout = { 0, 0, 0, 0 };
+static sport_record_t		mark    = { 0, 0, 0, 0 };
 
 
 /*
@@ -370,6 +358,49 @@ static void sensorTag_ClockSet(UTCTimeStruct *tm)
 static void sensorTag_ClockGet(UTCTimeStruct *t, UTCTime delta)
 {
 	osal_ConvertUTCTime(t, osal_getClock() - delta);
+}
+
+
+/**
+ * @fn      batt_measure
+ *
+ * @brief   Zeller's congruence:
+ *	    W = Y + D + [Y / 4] + [C / 4] + [26 x (M + 1) / 10] ¡V 2C - 1
+ *
+ * @param   none
+ *
+ * @return
+ */
+static unsigned char sensorTag_CalcWeek(UTCTimeStruct *t)
+{
+	short	century, year, month, day, week;
+
+	dmsg((" - %04d.%02d.%02d", t->year, t->month, t->day));
+
+	//
+	if (t->month < 3) {
+		t->year  -= 1;
+		t->month += 12;
+	}
+	day     = t->day;
+	month	= t->month;
+	year	= t->year % 100;
+	century = t->year / 100;
+
+	//
+	week    = year;
+	week   += day;
+	week   += (year / 4);
+	week   += (century / 4);
+	week   += (26 * (month + 1) / 10);
+	week   -= (2 * century);
+	week   -= 1;
+	week   %= 7;
+	week    = (week < 0) ? week+7 : week;
+	week    = week % 7;
+
+	dmsg((" (%02d)\n", (unsigned char) week));
+	return (unsigned char) week;
 }
 
 
@@ -524,14 +555,12 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 
 		case PWMGR_S4:
 			adxl345_exit_sleep();
-//			osal_set_event(sensorTag_TaskID, EVT_GSENSOR);
 
 		case PWMGR_S1:
 		default:
 			pwmgr_state_change(PWMGR_S1, TIME_OLED_OFF);
 			break;
 		}
-//		osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_HOLD);
 
 		// find the current GAP advertising status
 		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
@@ -850,25 +879,16 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
  *
  * @return
  */
-const unsigned char	d1[] = {
-	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,
-	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,
-	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,	0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00, 0x40, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x4e, 0x00, 0x13, 0x00, 0xfb, 0x00, 0xa0,
-	0x00, 0x33, 0x00, 0xc5, 0x00, 0xf5, 0x00, 0xf8, 0x00, 0xf0,	0x00, 0xec, 0x00, 0xf6, 0x00, 0xa5, 0x00, 0xc6, 0x00, 0x68,
-	0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x47, 0x00, 0xf1,	0x00, 0x47, 0x00, 0x0c, 0x00, 0xa0, 0x00, 0x00, 0x00, 0x00,
-};
-
 static char SensorTag_PktParsing(pt_t *pkt)
 {
 	unsigned char	chksum_recv;
 	unsigned char	chksum_calc;
 	UTCTimeStruct	time;
 	char		ret = 1;
-
+	unsigned char	len, i;
+	unsigned short	*src;
+	unsigned short	distance;	// step   x stride
+	unsigned short	calorie;	// weight x distance x 1.036
 
 	chksum_calc = ptProfile_CalcChksum(pkt->header.len, pkt->header.ptr);
 
@@ -891,14 +911,34 @@ static char SensorTag_PktParsing(pt_t *pkt)
 		chksum_recv = pkt->req.get_ssdcg_by_week.chksum;
 		if (chksum_recv == chksum_calc) {
 #if 1
-//			sensorTag_ClockGet(&time, 0);
-
 			pkt->rsp.get_week_ssdcg_ok.id      = GET_WEEK_SSDCG_OK_RSP;
 			pkt->rsp.get_week_ssdcg_ok.len     = 0xb4;
-//			pkt->rsp.get_week_ssdcg_ok.date[0] = (unsigned char) time.year;
-//			pkt->rsp.get_week_ssdcg_ok.date[1] = time.month;
-//			pkt->rsp.get_week_ssdcg_ok.date[2] = time.day;
-			osal_memcpy(&pkt->rsp.get_week_ssdcg_ok.info[0], d1, 30*6);
+
+			//
+			hash_set_getkey(pkt->req.get_ssdcg_by_week.days, pkt->req.get_ssdcg_by_week.hours);
+			len = pkt->rsp.get_week_ssdcg_ok.len / (3*sizeof(unsigned short));
+			for (i=0; i<len; i++) {
+				src = (unsigned short *) hash_get();
+				if ((*src & 0xC000) != 0xC000) {
+					distance = ((*src & 0x3FFF) * pi.stride) / 100UL;
+					calorie  = (unsigned short) ((float) (distance  / 1000UL * pi.weight) * 1.036);
+//					distance = 0x0202;
+//					calorie  = 0x0101;
+				} else {
+					*src	 = 0xc000;
+					calorie  = 0x0000;
+					distance = 0x0000;
+//					*src	 = 0xc102;
+//					calorie  = 0x0304;
+//					distance = 0x0506;
+				}
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+0] = HI_UINT16(*src);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+1] = LO_UINT16(*src);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+2] = HI_UINT16(calorie);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+3] = LO_UINT16(calorie);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+4] = HI_UINT16(distance);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+5] = LO_UINT16(distance);
+			}
 			pkt->rsp.get_week_ssdcg_ok.chksum  = ptProfile_CalcChksum(pkt->header.len, pkt->header.ptr);
 #else
 			pkt->rsp.get_week_ssdcg_ok.id      = GET_WEEK_SSDCG_OK_RSP;
@@ -917,7 +957,11 @@ static char SensorTag_PktParsing(pt_t *pkt)
 	case CLR_DATA_REQ:
 		chksum_recv = pkt->req.clear_data.chksum;
 		if (chksum_recv == chksum_calc) {
-			osal_memset(ptdb, 0xFF, sizeof(ptdb));
+			hash_rst();
+
+			osal_memset(&normal,  0, sizeof(sport_record_t));
+			osal_memset(&workout, 0, sizeof(sport_record_t));
+			osal_memset(&mark,    0, sizeof(sport_record_t));
 
 			pkt->rsp.clr_data_ok.id     = CLR_DATA_OK_RSP;
 			pkt->rsp.clr_data_ok.len    = 0x00;
@@ -940,8 +984,10 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			time.month   = pkt->req.set_dev_time.month;
 			time.year    = (unsigned short) pkt->req.set_dev_time.year + 2000;
 
-			normal.week  = pkt->req.set_dev_time.week;
+//			normal.week  = pkt->req.set_dev_time.week;
+			normal.week  = sensorTag_CalcWeek(&time);
 			sensorTag_ClockSet(&time);
+			hash_set_putkey(normal.week, time.hour, time.minutes);
 
 			pkt->rsp.set_dev_time_ok.id	= SET_DEV_TIME_OK_RSP;
 			pkt->rsp.set_dev_time_ok.len	= 0x04;
@@ -1010,15 +1056,13 @@ static char SensorTag_PktParsing(pt_t *pkt)
  *
  * @return  none
  */
-static pt_t	pkt;
-
 static void ptServ1ChgCB(uint8 paramID)
 {
 	switch (paramID) {
 	case PTPROFILE_SERV1_CHAR:
-		ptServ1_GetParameter(PTPROFILE_SERV1_CHAR, &pkt);
-		if (SensorTag_PktParsing(&pkt)) {
-			ptServ2_SetParameter(PTPROFILE_SERV2_CHAR, pkt.header.len+3, (void *) &pkt);
+		ptServ1_GetParameter(PTPROFILE_SERV1_CHAR, &ptpkt);
+		if (SensorTag_PktParsing(&ptpkt)) {
+			ptServ2_SetParameter(PTPROFILE_SERV2_CHAR, ptpkt.header.len+3, (void *) &ptpkt);
 		}
 		break;
 
@@ -1166,7 +1210,7 @@ void SensorTag_Init(uint8 task_id)
 	// Initialise sensor drivers
 //	kxti9_init();
 
-	osal_memset(ptdb, 0xFF, sizeof(ptdb));
+	hash_rst();
 
 	// Register callbacks with profile
 	ptProfile_RegisterAppCBs(&ptServ1CBs);
@@ -1298,7 +1342,8 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_SYSRST) {
 		if (key1_press) {
 			fmsg(("\033[40;32m[system reset]\033[0m\n"));
-			HAL_SYSTEM_RESET();
+//			HAL_SYSTEM_RESET();
+			adxl345_self_calibration();
 		}
 		return (events ^ EVT_SYSRST);
 	}
@@ -1369,6 +1414,24 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_RTC) {
 		// performed once per second
 
+
+		// record data
+		if ((pwmgr != PWMGR_S5) && (pwmgr != PWMGR_S6)) {
+			if (!hash_is_full()) {	
+				if ((osal_getClock() - mark.time) >= (10UL/*10UL*60UL*/)) {
+					unsigned short	tmp = normal.steps - mark.steps;
+					switch (opmode & 0xF0) {
+					case MODE_WORKOUT: tmp |= 0x8000; break;
+					case MODE_SLEEP:   tmp |= 0x4000; break;
+					}
+					hash_put(&tmp);
+
+					mark.steps = normal.steps;
+					mark.time  = osal_getClock();
+				}
+			}
+		}
+
 		// power management
 		switch (pwmgr) {
 		case PWMGR_S0:
@@ -1385,13 +1448,10 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 			pmsg(("\033[40;35mS1 (rtc+gsen+ble+oled)\033[0m\n"));
 			if (pwmgr_saving_timer()) {
 				oled_enter_sleep();
-
+				osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
+				osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
 				osal_stop_timerEx(sensorTag_TaskID, EVT_SYSRST);
-//				osal_stop_timerEx(sensorTag_TaskID, EVT_MODE);
-//				osal_stop_timerEx(sensorTag_TaskID, EVT_SLEEP);
 
-//				osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
-//				pwmgr_state_change(PWMGR_S2, 0);
 				pwmgr_state_change(PWMGR_S3, TIME_GSEN_OFF);
 			}
 			break;
@@ -1401,8 +1461,6 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 			if (gapProfileState == GAPROLE_WAITING) {
 				// enable key interrupt mode
 				InitBoard(OB_READY);
-
-//				osal_pwrmgr_task_state(sensorTag_TaskID, PWRMGR_CONSERVE);
 				pwmgr_state_change(PWMGR_S3, TIME_GSEN_OFF);
 			}
 			break;
@@ -1458,14 +1516,14 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_CHARGING) {
 		if (pwmgr != PWMGR_S1) {
 			if (!BATCD_SBIT) {
-				battmsg(("charging...\n"));
+				dmsg(("[charging]\n"));
 				oled_exit_sleep();
 				if ((pwmgr == PWMGR_S5) || (pwmgr == PWMGR_S6)) {
 					osal_start_reload_timer(sensorTag_TaskID, EVT_RTC, PERIOD_RTC);
 					pwmgr_state_change(PWMGR_S4, 0);
 				}
 			} else {
-				battmsg(("no charge...\n"));
+				dmsg(("[no charge]\n"));
 				oled_enter_sleep();
 			}
 		}

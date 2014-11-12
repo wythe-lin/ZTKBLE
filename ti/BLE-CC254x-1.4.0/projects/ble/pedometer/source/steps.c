@@ -32,7 +32,7 @@
  *
  *****************************************************************************
  */
-#define DBG_MSG			0
+#define DBG_MSG			1
 #define DBG_TWIN		1
 
 #if (DBG_MSG == 1)
@@ -81,13 +81,13 @@ static unsigned char	filter_times  = 0;
 static unsigned short	_max[3]       = { 0,    0,    0 };	// maximum for calculating dynamic threshold and precision
 static unsigned short	_min[3]       = { 8192, 8192, 8192 };	// minimum for calculating dynamic threshold and precision
 
-static unsigned short	_vpp[3]       = {0, 0, 0};		// peak-to-peak for calculating dynamic precision
-static unsigned char	_bad_flag[3]  = {0, 0, 0};		// bad flag for peak-to-peak value less than 0.5625g
-static unsigned short	_threshold[3] = {0, 0, 0};		// dynamic threshold
-static unsigned short	_precision[3] = {24, 24, 24};		// dynamic precision
+static unsigned short	_vpp[3]       = {  0,  0,  0 };		// peak-to-peak for calculating dynamic precision
+static unsigned char	_bad_flag[3]  = {  0,  0,  0 };		// bad flag for peak-to-peak value less than 0.5625g
+static unsigned short	_threshold[3] = {  0,  0,  0 };		// dynamic threshold
+static unsigned short	_precision[3] = { 24, 24, 24 };		// dynamic precision
 
-static unsigned short	_sample_old[3] = {0, 0, 0};		// old fixed value
-static unsigned short	_sample_new[3] = {0, 0, 0};		// new fixed value
+static unsigned short	_sample_old[3] = { 0, 0, 0 };		// old fixed value
+static unsigned short	_sample_new[3] = { 0, 0, 0 };		// new fixed value
 
 unsigned long		STEPS = 0;				// new steps
 
@@ -246,15 +246,11 @@ unsigned long algo_step(unsigned short *buf)
 		}
 	}
 	samples++;						// record the sample times
-	/*for (i=X_CHANNEL; i<=Z_CHANNEL; i++) {
-		switch (i) {
-		case X_CHANNEL:	dmsg(("x: "));	break;
-		case Y_CHANNEL:	dmsg(("y: "));	break;
-		case Z_CHANNEL:	dmsg(("z: "));	break;
-		}
-		dmsg(("max=%05d, min=%05d\n", _max[i], _min[i]));
-	}*/
-
+/*
+	dmsg(("[x]: max=%04x min=%04x, ", _max[X_CHANNEL], _min[X_CHANNEL]));
+	dmsg(("[y]: max=%04x min=%04x, ", _max[Y_CHANNEL], _min[Y_CHANNEL]));
+	dmsg(("[z]: max=%04x min=%04x\n", _max[Z_CHANNEL], _min[Z_CHANNEL]));
+*/
 	/* calculate the dynamic threshold and precision */
 	if (samples == 50) {
 		samples = 0;
@@ -271,24 +267,21 @@ unsigned long algo_step(unsigned short *buf)
 			if (_vpp[i] >= 1600) {					// 1600 --- 6.25g	(experiment value, decided by customer)
 				_precision[i] = _vpp[i] / 320;			// 320  --- 1.25g	(experiment value, decided by customer)
 //			} else if ((_vpp[i] >= 496) && (_vpp[i] < 1600)) {	// 496  --- 1.9375g	(experiment value, decided by customer)
-			} else if ((_vpp[i] >= 72) && (_vpp[i] < 1600)) {	// 72   --- 0.288g
+			} else if ((_vpp[i] >= 256) && (_vpp[i] < 1600)) {	// 256  --- 1.0g
 				_precision[i] = 48;				// 48   --- 0.1875g	(experiment value, decided by customer)
 //			} else if ((_vpp[i] >= 144) && (_vpp[i] < 496))	{	// 144  --- 0.5625g	(experiment value, decided by customer)
-			} else if ((_vpp[i] >= 36) && (_vpp[i] < 72))	{	// 36   --- 0.144g
+			} else if ((_vpp[i] >=  72) && (_vpp[i] < 256))	{	// 72   --- 0.288g
 				_precision[i] = 32;				// 32   --- 0.125g	(experiment value, decided by customer)
 			} else {
 				_precision[i] = 16;				// 16   --- 0.064g
 				_bad_flag[i]  = 1;
 			}
 		}
-		/*for (i=X_CHANNEL; i<=Z_CHANNEL; i++) {
-			switch (i) {
-			case X_CHANNEL:	dmsg(("x: "));	break;
-			case Y_CHANNEL:	dmsg(("y: "));	break;
-			case Z_CHANNEL:	dmsg(("z: "));	break;
-			}
-			dmsg(("vpp=%05d, dt=%05d, dp=%05d, badfg=%02d\n", _vpp[i], _threshold[i], _precision[i], _bad_flag[i]));
-		}*/
+
+		dmsg(("[x]: vpp=%04x p=%02x fg=%02x, ", _vpp[X_CHANNEL], _precision[X_CHANNEL], _bad_flag[X_CHANNEL]));
+		dmsg(("[y]: vpp=%04x p=%02x fg=%02x, ", _vpp[Y_CHANNEL], _precision[Y_CHANNEL], _bad_flag[Y_CHANNEL]));
+		dmsg(("[z]: vpp=%04x p=%02x fg=%02x\n", _vpp[Z_CHANNEL], _precision[Z_CHANNEL], _bad_flag[Z_CHANNEL]));
+
 	}
 
 	/* Linear Shift Register */

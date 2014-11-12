@@ -277,7 +277,7 @@
         </option>
         <option>
           <name>CCDefines</name>
-          <state>INT_HEAP_LEN=3072</state>
+          <state>INT_HEAP_LEN=2048</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
           <state>POWER_SAVING</state>
@@ -1366,7 +1366,7 @@
           <state>HAL_IMAGE_A</state>
           <state>FEATURE_OAD</state>
           <state>OAD_KEEP_NV_PAGES</state>
-          <state>INT_HEAP_LEN=3072</state>
+          <state>INT_HEAP_LEN=2048</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
           <state>POWER_SAVING</state>
@@ -2457,7 +2457,7 @@
           <state>HAL_IMAGE_B</state>
           <state>FEATURE_OAD</state>
           <state>OAD_KEEP_NV_PAGES</state>
-          <state>INT_HEAP_LEN=3072</state>
+          <state>INT_HEAP_LEN=2048</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
           <state>POWER_SAVING</state>
@@ -3278,6 +3278,9 @@
       <name>$PROJ_DIR$\..\source\fonts.c</name>
     </file>
     <file>
+      <name>$PROJ_DIR$\..\source\hash.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\source\oled.c</name>
     </file>
     <file>
@@ -3430,15 +3433,9 @@
     <file>
       <name>$PROJ_DIR$\..\..\common\npi\npi_np\npi.c</name>
     </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\common\npi\npi_np\npi.h</name>
-    </file>
   </group>
   <group>
     <name>OSAL</name>
-    <file>
-      <name>$PROJ_DIR$\..\..\..\..\Components\ble\include\bcomdef.h</name>
-    </file>
     <file>
       <name>$PROJ_DIR$\..\..\..\..\Components\osal\common\OSAL.c</name>
     </file>
@@ -3501,9 +3498,6 @@
     </file>
     <file>
       <name>$PROJ_DIR$\..\..\common\cc2540\OnBoard.c</name>
-    </file>
-    <file>
-      <name>$PROJ_DIR$\..\..\common\cc2540\OnBoard.h</name>
     </file>
   </group>
 </project>

@@ -45,6 +45,7 @@
     #define dmsg(x)
 #endif
 
+
 #define adxl345_delay(n) \
 do { \
 	volatile unsigned long	i; \
@@ -59,6 +60,26 @@ do { \
 { \
 	HalI2CInit(XL345_SLAVE_ADDR, i2cClock_267KHZ); \
 }
+
+
+
+/*
+ *****************************************************************************
+ *
+ * macros
+ *
+ *****************************************************************************
+ */
+typedef struct {
+	unsigned char	lsb;
+	unsigned char	msb;
+} b16_t;
+
+typedef union {
+	b16_t		u8;
+	unsigned short	u16;
+	signed   short	s16;
+} endian_t;
 
 
 /*
@@ -87,6 +108,16 @@ static unsigned char adxl345_reg_read(unsigned char addr, unsigned char *val)
 	return 0;
 }
 
+static unsigned char adxl345_reg_multi_read(unsigned char addr, unsigned char n, unsigned char *val)
+{
+	/* send address we're reading from */
+	if (HalI2CWrite(1, &addr) == 1) {
+		/* now read data */
+		return HalI2CRead(n, val);
+	}
+	return 0;
+}
+
 
 /*
  ******************************************************************************
@@ -109,6 +140,7 @@ void adxl345_softrst(void)
 	adxl345_reg_write(XL345_THRESH_ACT,    0);
 	adxl345_reg_write(XL345_ACT_INACT_CTL, 0);
 	adxl345_reg_write(XL345_FIFO_CTL,      0);
+	adxl345_reg_write(XL345_POWER_CTL,     0);
 
 	// CPU I/O function
 	GSINT1_SEL &= ~GSINT1_BV;
@@ -178,7 +210,7 @@ void adxl345_sampling(unsigned char rate)
 		adxl345_reg_write(XL345_INT_ENABLE, inten);
 	}
 	adxl345_reg_write(XL345_INT_MAP,     XL345_WATERMARK);						// INT_MAP: water mark interrupt to the INT2 pin
-	adxl345_reg_write(XL345_DATA_FORMAT, XL345_INT_LOW | XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: +/-16g range, right justified,  256->1g
+	adxl345_reg_write(XL345_DATA_FORMAT, XL345_INT_LOW | XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: 2g range, 256->1g
 	adxl345_reg_write(XL345_FIFO_CTL,    XL345_FIFO_MODE_FIFO | 10);				// FIFO_CTL: FIFO mode, samples = 10 
 	adxl345_reg_write(XL345_POWER_CTL,   XL345_MEASURE);						// POWER_CTL: measure mode
 
@@ -198,8 +230,8 @@ void adxl345_enter_sleep(void)
 
 void adxl345_exit_sleep(void)
 {
-	adxl345_sampling(XL345_BW_50);
 	adxl345_activity(0);
+	adxl345_sampling(XL345_BW_50);
 }
 
 void adxl345_shutdown(void)
@@ -250,31 +282,24 @@ unsigned char adxl345_chk_fifo(void)
  */
 void adxl345_read(unsigned short *p)
 {
-	unsigned char	i;
-	unsigned char	x0, x1;
-	unsigned char	y0, y1;
-	unsigned char	z0, z1;
+	endian_t	x, y, z;
 
 	// read the three registers
-	adxl345_reg_read(XL345_DATAX0, &x0);
-	adxl345_reg_read(XL345_DATAX1, &x1);
+	adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
+	adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
+	adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
 
-	adxl345_reg_read(XL345_DATAY0, &y0);
-	adxl345_reg_read(XL345_DATAY1, &y1);
-
-	adxl345_reg_read(XL345_DATAZ0, &z0);
-	adxl345_reg_read(XL345_DATAZ1, &z1);
-
-	p[0] = ((unsigned short) x1) << 8 | x0;
-	p[1] = ((unsigned short) y1) << 8 | y0;
-	p[2] = ((unsigned short) z1) << 8 | z0;
+//	adxl345_reg_read(XL345_DATAX0, &x.u8.lsb);
+//	adxl345_reg_read(XL345_DATAX1, &x.u8.msb);
+//	adxl345_reg_read(XL345_DATAY0, &y.u8.lsb);
+//	adxl345_reg_read(XL345_DATAY1, &y.u8.msb);
+//	adxl345_reg_read(XL345_DATAZ0, &z.u8.lsb);
+//	adxl345_reg_read(XL345_DATAZ1, &z.u8.msb);
 
 	// translate the two's complement to true binary code
-	for (i=0; i<3; i++) {
-		if (p[i] > 32768) {
-			p[i] = (p[i] ^ 0xFFFF) + 1;
-		}
-	}
+	p[0] = (x.s16 < 0) ? (unsigned short) (x.s16 * (-1)) : x.u16;
+	p[1] = (y.s16 < 0) ? (unsigned short) (y.s16 * (-1)) : y.u16;
+	p[2] = (z.s16 < 0) ? (unsigned short) (z.s16 * (-1)) : z.u16;
 }
 
 
@@ -300,83 +325,97 @@ void adxl345_int2_isr(void)
 #define ADXL345_CALIB_NUM	16
 void adxl345_self_calibration(void)
 {
-	unsigned char	x0, x1;
-	unsigned char	y0, y1;
-	unsigned char	z0, z1;
 	unsigned char	intsrc, n;
 	long		cx, cy, cz;
-	unsigned char	inten, bwrate, dformat;
+	unsigned char	keep[5];
+	endian_t	x, y, z;
 
-
-	// enter self calibration
 	adxl345_select();
 
-	adxl345_reg_read(XL345_BW_RATE,     &bwrate);
-	adxl345_reg_read(XL345_DATA_FORMAT, &dformat);
-	adxl345_reg_read(XL345_INT_ENABLE,  &inten);
+	// keep old status
+	dmsg(("[adxl345]: keep old status\n"));
+	adxl345_reg_read(XL345_BW_RATE,     &keep[0]);
+	adxl345_reg_read(XL345_DATA_FORMAT, &keep[1]);
+	adxl345_reg_read(XL345_INT_ENABLE,  &keep[2]);
+	adxl345_reg_read(XL345_FIFO_CTL,    &keep[3]);
+	adxl345_reg_read(XL345_POWER_CTL,   &keep[4]);
 
-	adxl345_reg_write(XL345_BW_RATE,     XL345_RATE_100);				// output data rate: 100Hz
-	adxl345_reg_write(XL345_DATA_FORMAT, XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// All g-ranges, full resolution,  256LSB/g
-	adxl345_reg_write(XL345_INT_ENABLE,  0);
+	// enter self calibration
+	dmsg(("[adxl345]: enter self calibration\n"));
 	adxl345_reg_write(XL345_OFSX,	     0);
 	adxl345_reg_write(XL345_OFSY,	     0);
 	adxl345_reg_write(XL345_OFSZ,	     0);
+	adxl345_reg_write(XL345_BW_RATE,     XL345_RATE_100);				// output data rate: 100Hz
+	adxl345_reg_write(XL345_DATA_FORMAT, XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// All g-ranges, full resolution,  256LSB/g
+	adxl345_reg_write(XL345_INT_ENABLE,  0);
+	adxl345_reg_write(XL345_FIFO_CTL,    XL345_FIFO_MODE_FIFO | 16);		// FIFO_CTL: FIFO mode, samples = 16 
+	adxl345_reg_write(XL345_POWER_CTL,   XL345_MEASURE);				// POWER_CTL: measure mode
 
 	// get samples
-	cx = 0;	cy = 0;	cz = 0;
-	for (n=0; n<ADXL345_CALIB_NUM; n++) {
-retry:
-		adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
-		if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {
-			adxl345_delay(50);
-			goto retry;
-		}
-		adxl345_reg_read(XL345_DATAX0, &x0);
-		adxl345_reg_read(XL345_DATAX1, &x1);
-		adxl345_reg_read(XL345_DATAY0, &y0);
-		adxl345_reg_read(XL345_DATAY1, &y1);
-		adxl345_reg_read(XL345_DATAZ0, &z0);
-		adxl345_reg_read(XL345_DATAZ1, &z1);
+	dmsg(("[adxl345]: get samples\n"));
 
-		cx += ((unsigned short) x1) << 8 | x0;
-		cy += ((unsigned short) y1) << 8 | y0;
-		cz += ((unsigned short) z1) << 8 | z0;
+wait:
+	adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
+	if ((intsrc & XL345_WATERMARK) != XL345_WATERMARK) {
+		adxl345_delay(50);
+		goto wait;
 	}
 
-	cx = cx / ADXL345_CALIB_NUM;
-	cy = cy / ADXL345_CALIB_NUM;
-	cz = cz / ADXL345_CALIB_NUM;
+	cx = 0;	cy = 0;	cz = 0;
+	for (n=0; n<ADXL345_CALIB_NUM; n++) {
+		adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
+		adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
+		adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
+
+		cx += (long) x.s16;
+		cy += (long) y.s16;
+		cz += (long) z.s16;
+	}
+
+	cx /= ADXL345_CALIB_NUM;
+	cy /= ADXL345_CALIB_NUM;
+	cz /= ADXL345_CALIB_NUM;
+	dmsg(("[adxl345]: before - x=%0ld, y=%0ld, z=%0ld\n", cx, cy, cz));
 
 	// result
-	cx = (cx / 4) * (-1);
-	cy = (cy / 4) * (-1);
-	cz = (cz / 4) * (-1);
+	cx = cx * (-1L);
+	cy = cy * (-1L);
+	if (cz > 0) {
+		cz =  256L - cz;
+	} else {
+		cz = -256L - cz;
+	}
+	dmsg(("[adxl345]: cali   - x=%0ld, y=%0ld, z=%0ld\n", cx, cy, cz));
 
+	cx /= 4;
+	cy /= 4;
+	cz /= 4;
 	adxl345_reg_write(XL345_OFSX, (char) cx);
 	adxl345_reg_write(XL345_OFSY, (char) cy);
 	adxl345_reg_write(XL345_OFSZ, (char) cz);
 
+	adxl345_reg_write(XL345_FIFO_CTL,  0);
+	adxl345_reg_write(XL345_POWER_CTL, 0);
+	adxl345_delay(50);
+	adxl345_reg_write(XL345_POWER_CTL, XL345_MEASURE);
 not_ready:
 	adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
 	if ((intsrc & XL345_DATAREADY) != XL345_DATAREADY) {
 		adxl345_delay(50);
 		goto not_ready;
 	}
-	adxl345_reg_read(XL345_DATAX0, &x0);
-	adxl345_reg_read(XL345_DATAX1, &x1);
-	adxl345_reg_read(XL345_DATAY0, &y0);
-	adxl345_reg_read(XL345_DATAY1, &y1);
-	adxl345_reg_read(XL345_DATAZ0, &z0);
-	adxl345_reg_read(XL345_DATAZ1, &z1);
+	adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
+	adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
+	adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
+	dmsg(("[adxl345]: after  - x=%0d, y=%0d, z=%0d\n", x.s16, y.s16, z.s16));
 
-	cx = ((unsigned short) x1) << 8 | x0;
-	cy = ((unsigned short) y1) << 8 | y0;
-	cz = ((unsigned short) z1) << 8 | z0;
-
-	// 
-	adxl345_reg_write(XL345_BW_RATE,     bwrate);
-	adxl345_reg_write(XL345_DATA_FORMAT, dformat);
-	adxl345_reg_write(XL345_INT_ENABLE,  inten);
+	// restore old status
+	dmsg(("[adxl345]: restore old status\n"));
+	adxl345_reg_write(XL345_BW_RATE,     keep[0]);
+	adxl345_reg_write(XL345_DATA_FORMAT, keep[1]);
+	adxl345_reg_write(XL345_INT_ENABLE,  keep[2]);
+	adxl345_reg_write(XL345_FIFO_CTL,    keep[3]);
+	adxl345_reg_write(XL345_POWER_CTL,   keep[4]);
 }
 
 

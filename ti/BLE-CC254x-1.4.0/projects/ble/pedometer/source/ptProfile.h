@@ -53,7 +53,6 @@ extern "C"
 #define PTPROFILE_SERV1_CHAR_UUID	0xFFE9
 #define PTPROFILE_SERV2_CHAR_UUID	0xFFE4
 
-
 // opcode & response
 typedef enum {
 	SET_BT_NAME_REQ			= 0x81,
@@ -254,7 +253,6 @@ typedef struct {
 typedef struct {
 	unsigned char	id;
 	unsigned char	len;
-//	unsigned char	date[3];
 	unsigned char	info[180];
 	unsigned char	chksum;
 } pt_get_week_ssdcg_ok_rsp_t;
@@ -438,13 +436,26 @@ typedef union {
 } pt_t;
 
 
+// profile database
+typedef struct {
+	unsigned char	lsb;
+	unsigned char	msb;
+} endian_t;
+
+typedef union {
+	endian_t	b16;
+	unsigned short	u16;
+} ptdb_t;
+
 
 
 /*
  ******************************************************************************
- * Macros
+ * Variables
  ******************************************************************************
  */
+extern pt_t		ptpkt;
+
 
 
 /*

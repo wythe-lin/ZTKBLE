@@ -108,7 +108,7 @@ static CONST gattAttrType_t	ptServ1 = { ATT_BT_UUID_SIZE, ptServ1UUID };
 
 // ProTrack Profile Characteristic 1 Properties, Value, User Description
 static uint8			ptServ1CharProps        = GATT_PROP_WRITE;
-static pt_t			ptProfileChar           = { 0 };
+pt_t				ptpkt;
 static uint8			ptServ1CharUserDesp[17] = "Write\0";
 
 // ProTrack Profile Service 1 attribute
@@ -145,7 +145,7 @@ static gattAttribute_t		ptServ1AttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] = {
 		{ ATT_BT_UUID_SIZE, ptServ1CharUUID },
 		GATT_PERMIT_WRITE,
 		0,
-		(unsigned char *) &ptProfileChar
+		(unsigned char *) &ptpkt
 	},
 
 	// User Description
@@ -180,7 +180,7 @@ static gattAttribute_t		ptServ2AttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] = {
 		{ ATT_BT_UUID_SIZE, ptServ2CharUUID },
 		GATT_PERMIT_READ,	//0,
 		0,
-		(unsigned char *) &ptProfileChar
+		(unsigned char *) &ptpkt
 	},
 
 	// Configuration
@@ -444,7 +444,6 @@ bStatus_t ptServ1_GetParameter(uint8 param, void *value)
 
 	switch (param) {
 	case PTPROFILE_SERV1_CHAR:
-		osal_memcpy(value, &ptProfileChar, ptProfileChar.header.len+3);
 		{
 			uint8	i;
 			uint8	*pValue = (uint8 *) value;

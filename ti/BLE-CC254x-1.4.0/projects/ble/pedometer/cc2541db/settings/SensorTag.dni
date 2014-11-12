@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=-2020692135
+Checksum=-688295866
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -26,7 +26,8 @@ Fmt2=UTCTimeStruct-minutes	3	0
 Fmt3=UTCTimeStruct-month	4	0
 Fmt4=UTCTimeStruct-seconds	3	0
 Fmt5=UTCTimeStruct-year	4	0
-Fmt6=struct sport_info-distance	3	0
+Fmt6=b16_t-lsb	4	0
+Fmt7=b16_t-msb	4	0
 [watch_formats]
 Fmt0={W}0:ADCCON1	1	0
 Fmt1={W}0:ADCCON3	1	0
@@ -39,12 +40,15 @@ Fmt7={W}0:P0INP	1	0
 Fmt8={W}0:P0SEL	1	0
 Fmt9={W}0:P1IFG	1	0
 Fmt10={W}0:TR0	4	0
-Fmt11={W}0:days	3	0
-Fmt12={W}0:reading	4	0
+Fmt11={W}0:cx	4	0
+Fmt12={W}0:cy	4	0
+Fmt13={W}0:days	3	0
+Fmt14={W}0:reading	4	0
 [Breakpoints]
 Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
-Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.489.1" 0 0 0 0 "" 0 ""
-Count=2
+Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.488.1" 0 0 0 0 "" 0 ""
+Bp2=_ "STD_CODE" "{$PROJ_DIR$\..\source\adxl345.c}.364.2" 1 0 0 0 "" 0 ""
+Count=3
 [ChipconEmu]
 Stop timers on halt=0
 Leave target running=1

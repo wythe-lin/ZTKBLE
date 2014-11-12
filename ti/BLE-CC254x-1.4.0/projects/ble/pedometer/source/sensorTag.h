@@ -115,13 +115,13 @@ struct pi_others {
 	unsigned char	bt_auto_close_time;	// unit: minute
 };
 
-struct sport_info {
+typedef struct {
 	unsigned long	steps;
 	unsigned long	distance;	// step   x stride
 	unsigned short	calorie;	// weight x distance x 1.036
 	UTCTime		time;
 	unsigned char	week;
-};
+} sport_record_t;
 
 typedef enum {
 	PWMGR_S0 = 0,		// power on
