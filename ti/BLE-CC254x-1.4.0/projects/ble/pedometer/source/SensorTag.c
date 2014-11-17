@@ -490,11 +490,10 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 		oled_exit_sleep();
 
 		// KEY action
+		osal_start_timerEx(sensorTag_TaskID, EVT_MODE,   PERIOD_MODE_SWITCH);
+		osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
+		osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
 		if (pwmgr == PWMGR_S1) {
-			osal_start_timerEx(sensorTag_TaskID, EVT_MODE,   PERIOD_MODE_SWITCH);
-			osal_start_timerEx(sensorTag_TaskID, EVT_SLEEP,  PERIOD_MODE_SLEEP);
-			osal_start_timerEx(sensorTag_TaskID, EVT_SYSRST, PERIOD_SYSRST);
-
 			switch (opmode & 0xF0) {
 			case MODE_NORMAL:
 				opmode++;

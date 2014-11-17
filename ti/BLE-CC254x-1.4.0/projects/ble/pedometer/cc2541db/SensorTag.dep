@@ -90,7 +90,7 @@
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_assert.pbi</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_interrupt.pbi</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_i2c.pbi</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\hal_flash.pbi</file>
@@ -105,7 +105,7 @@
       <file>$PROJ_DIR$\..\..\Include\gapgattserver.h</file>
       <file>$PROJ_DIR$\..\..\Include\gattservapp.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\OAD\oad.h</file>
-      <file>$PROJ_DIR$\..\source\ptprofile.h</file>
+      <file>$PROJ_DIR$\..\source\ptProfile.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.h</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\peripheral.r51</file>
       <file>$PROJ_DIR$\CC2541DK-Sensor\Obj\SensorTag_Main.pbi</file>
@@ -1447,13 +1447,13 @@
       <file>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.h</file>
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\comdef.h</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_adc.h</file>
       <file>$PROJ_DIR$\..\..\Include\gapgattserver.h</file>
       <file>$PROJ_DIR$\..\..\Include\gattservapp.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\OAD\oad.h</file>
-      <file>$PROJ_DIR$\..\source\ptprofile.h</file>
+      <file>$PROJ_DIR$\..\source\ptProfile.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.h</file>
       <file>$PROJ_DIR$\..\source\kxti9-1001.h</file>
@@ -3328,13 +3328,13 @@
       <file>$PROJ_DIR$\..\..\Profiles\SensorProfile\st_util.h</file>
       <file>$PROJ_DIR$\..\source\uart.h</file>
       <file>$PROJ_DIR$\..\source\ssd1306.h</file>
-      <file>$PROJ_DIR$\..\source\sensorTag.h</file>
+      <file>$PROJ_DIR$\..\source\SensorTag.h</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\osal\include\comdef.h</file>
       <file>$PROJ_DIR$\..\..\..\..\Components\hal\include\hal_adc.h</file>
       <file>$PROJ_DIR$\..\..\Include\gapgattserver.h</file>
       <file>$PROJ_DIR$\..\..\Include\gattservapp.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\OAD\oad.h</file>
-      <file>$PROJ_DIR$\..\source\ptprofile.h</file>
+      <file>$PROJ_DIR$\..\source\ptProfile.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\Roles\gapbondmgr.h</file>
       <file>$PROJ_DIR$\..\..\Profiles\OAD\oad_target.h</file>
       <file>$PROJ_DIR$\..\source\kxti9-1001.h</file>
