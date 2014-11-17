@@ -82,6 +82,8 @@
 #include "sensorTag.h"
 #include "hal_sensor.h"
 
+#include "defines.h"
+
 #include "uart.h"
 #include "oled.h"
 #include "fonts.h"
@@ -194,28 +196,6 @@
 
 // Connection Pause Peripheral time value (in seconds)
 #define DEFAULT_CONN_PAUSE_PERIPHERAL		(8)
-
-
-// battery level
-#define BATT_LEVEL_01				(0x1c00)	// 3.7V
-#define BATT_LEVEL_02				(0x1b28)	// 3.6V
-#define BATT_LEVEL_03				(0x1a77)	// 3.5V
-#define BATT_LEVEL_04				(0x1944)	// 3.4V
-#define BATT_LEVEL_05				(0x1898)	// 3.3V
-#define BATT_LEVEL_06				(0x16e7)	// 3.1V
-
-// how often to perform something (milliseconds)
-#define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
-#define PERIOD_MODE_SLEEP			(1000*4)	// into sleep mode
-#define PERIOD_CALIB				(1000*6)	// g-sensor calibration
-#define PERIOD_SYSRST				(1000*8)	// system reset
-#define PERIOD_DISP				(1000/5)	// oled display
-#define PERIOD_RTC				(1000*1)	// real time clock
-#define PERIOD_CHARGE_DEBOUNCE			(1000/1)	// battery charge detect debounce
-
-#define TIME_PWRON				(1)		// power on
-#define TIME_OLED_OFF				(5)		// oled off
-#define TIME_GSEN_OFF				(5)		// g-sensor off
 
 
 
@@ -1417,9 +1397,14 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 
 		// record data
 		if ((pwmgr != PWMGR_S5) && (pwmgr != PWMGR_S6)) {
-			if (!hash_is_full()) {	
-				if ((osal_getClock() - mark.time) >= (10UL/*10UL*60UL*/)) {
+#if defined(HAL_IMAGE_A) || defined(HAL_IMAGE_B)
+			if ((osal_getClock() - mark.time) >= (10UL*60UL)) {
+#else
+			if ((osal_getClock() - mark.time) >= (10UL)) {
+#endif
+				if (!hash_is_full()) {
 					unsigned short	tmp = normal.steps - mark.steps;
+
 					switch (opmode & 0xF0) {
 					case MODE_WORKOUT: tmp |= 0x8000; break;
 					case MODE_SLEEP:   tmp |= 0x4000; break;

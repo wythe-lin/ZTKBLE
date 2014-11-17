@@ -282,24 +282,18 @@ unsigned char adxl345_chk_fifo(void)
  */
 void adxl345_read(unsigned short *p)
 {
-	endian_t	x, y, z;
+	endian_t	*x, *y, *z, val[3];
 
 	// read the three registers
-	adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
-	adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
-	adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
-
-//	adxl345_reg_read(XL345_DATAX0, &x.u8.lsb);
-//	adxl345_reg_read(XL345_DATAX1, &x.u8.msb);
-//	adxl345_reg_read(XL345_DATAY0, &y.u8.lsb);
-//	adxl345_reg_read(XL345_DATAY1, &y.u8.msb);
-//	adxl345_reg_read(XL345_DATAZ0, &z.u8.lsb);
-//	adxl345_reg_read(XL345_DATAZ1, &z.u8.msb);
+	adxl345_reg_multi_read(XL345_DATAX0, 6, (unsigned char *) val);
 
 	// translate the two's complement to true binary code
-	p[0] = (x.s16 < 0) ? (unsigned short) (x.s16 * (-1)) : x.u16;
-	p[1] = (y.s16 < 0) ? (unsigned short) (y.s16 * (-1)) : y.u16;
-	p[2] = (z.s16 < 0) ? (unsigned short) (z.s16 * (-1)) : z.u16;
+	x    = &val[0];
+	y    = &val[1];
+	z    = &val[2];
+	p[0] = (x->s16 < 0) ? (unsigned short) (x->s16 * (-1)) : x->u16;
+	p[1] = (y->s16 < 0) ? (unsigned short) (y->s16 * (-1)) : y->u16;
+	p[2] = (z->s16 < 0) ? (unsigned short) (z->s16 * (-1)) : z->u16;
 }
 
 
@@ -328,7 +322,7 @@ void adxl345_self_calibration(void)
 	unsigned char	intsrc, n;
 	long		cx, cy, cz;
 	unsigned char	keep[5];
-	endian_t	x, y, z;
+	endian_t	*x, *y, *z, val[3];
 
 	adxl345_select();
 
@@ -353,6 +347,9 @@ void adxl345_self_calibration(void)
 
 	// get samples
 	dmsg(("[adxl345]: get samples\n"));
+	x = &val[0];
+	y = &val[1];
+	z = &val[2];
 
 wait:
 	adxl345_reg_read(XL345_INT_SOURCE, &intsrc);
@@ -363,13 +360,11 @@ wait:
 
 	cx = 0;	cy = 0;	cz = 0;
 	for (n=0; n<ADXL345_CALIB_NUM; n++) {
-		adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
-		adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
-		adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
+		adxl345_reg_multi_read(XL345_DATAX0, 6, (unsigned char *) val);
 
-		cx += (long) x.s16;
-		cy += (long) y.s16;
-		cz += (long) z.s16;
+		cx += (long) x->s16;
+		cy += (long) y->s16;
+		cz += (long) z->s16;
 	}
 
 	cx /= ADXL345_CALIB_NUM;
@@ -404,10 +399,8 @@ not_ready:
 		adxl345_delay(50);
 		goto not_ready;
 	}
-	adxl345_reg_multi_read(XL345_DATAX0, 2, (unsigned char *) &x);
-	adxl345_reg_multi_read(XL345_DATAY0, 2, (unsigned char *) &y);
-	adxl345_reg_multi_read(XL345_DATAZ0, 2, (unsigned char *) &z);
-	dmsg(("[adxl345]: after  - x=%0d, y=%0d, z=%0d\n", x.s16, y.s16, z.s16));
+	adxl345_reg_multi_read(XL345_DATAX0, 6, (unsigned char *) val);
+	dmsg(("[adxl345]: after  - x=%0d, y=%0d, z=%0d\n", x->s16, y->s16, z->s16));
 
 	// restore old status
 	dmsg(("[adxl345]: restore old status\n"));

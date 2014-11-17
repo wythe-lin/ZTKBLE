@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=-688295866
+Checksum=182725432
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -44,14 +44,6 @@ Fmt11={W}0:cx	4	0
 Fmt12={W}0:cy	4	0
 Fmt13={W}0:days	3	0
 Fmt14={W}0:reading	4	0
-[Breakpoints]
-Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
-Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.488.1" 0 0 0 0 "" 0 ""
-Bp2=_ "STD_CODE" "{$PROJ_DIR$\..\source\adxl345.c}.364.2" 1 0 0 0 "" 0 ""
-Count=3
-[ChipconEmu]
-Stop timers on halt=0
-Leave target running=1
 [Log file]
 LoggingEnabled=_ 0
 LogFile=_ ""
@@ -59,6 +51,13 @@ Category=_ 0
 [TermIOLog]
 LoggingEnabled=_ 0
 LogFile=_ ""
+[Breakpoints]
+Bp0=_ "STD_CODE" "LogicalCode:0x3EFEB" 0 0 0 0 "" 0 ""
+Bp1=_ "STD_CODE" "{$PROJ_DIR$\..\source\ptprofile.c}.488.1" 0 0 0 0 "" 0 ""
+Count=2
+[ChipconEmu]
+Stop timers on halt=0
+Leave target running=1
 [Aliases]
 Count=0
 SuppressDialog=0
