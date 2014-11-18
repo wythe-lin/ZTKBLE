@@ -21,7 +21,7 @@
  *
  ******************************************************************************
  */
-
+#include "defines.h"
 #include "steps.h"
 
 
@@ -49,15 +49,25 @@
 #endif
 
 // Three Axis acceleration Flag
-#define	X_CHANNEL			0
-#define	Y_CHANNEL			1
-#define	Z_CHANNEL			2
+#define	X_CHANNEL		0
+#define	Y_CHANNEL		1
+#define	Z_CHANNEL		2
 
-#define	TIMEWINDOW_MIN			10	// time window minimum 0.2s
-#define TIMEWINDOW_MAX			100	// time window maximum 2s
+#define REGULATION		4		// find stable rule steps
+#define INVALID			2		// lose stable rule steps
 
-#define REGULATION			4		// find stable rule steps
-#define INVALID				2		// lose stable rule steps
+#define __ACC_TWIN_MIN		GSEN_TIMEWINDOW_MIN
+#define __ACC_TWIN_MAX		GSEN_TIMEWINDOW_MAX
+
+#define __ACC_THH		GSEN_TH_HIGH
+#define __ACC_THM		GSEN_TH_MEDIUM
+#define __ACC_THL		GSEN_TH_LOW
+
+#define __ACC_PCS0		GSEN_PRECISION_0
+#define __ACC_PCS1		GSEN_PRECISION_1
+#define __ACC_PCS2		GSEN_PRECISION_2
+#define __ACC_PCS3		GSEN_PRECISION_3
+
 
 
 /*
@@ -135,7 +145,7 @@ static void time_window(char n)
 	} else {
 		// if it is not the first step, process as below
 		twmsg(("b"));
-		if ((interval >= TIMEWINDOW_MIN) && (interval <= TIMEWINDOW_MAX)) {
+		if ((interval >= __ACC_TWIN_MIN) && (interval <= __ACC_TWIN_MAX)) {
 			// if the step interval in the time window
 			twmsg(("1"));
 			InvalidSteps = 0;
@@ -160,7 +170,7 @@ static void time_window(char n)
 				interval  = 0;
 			}
 
-		} else if (interval < TIMEWINDOW_MIN) {
+		} else if (interval < __ACC_TWIN_MIN) {
 			// if time interval less than the time window under threshold
 			twmsg(("2"));
 			if (ReReg == 0) {
@@ -193,7 +203,7 @@ static void time_window(char n)
 				ReReg        = 1;
 			}
 
-		} else if (interval > TIMEWINDOW_MAX) {
+		} else if (interval > __ACC_TWIN_MAX) {
 			// if the interval more than upper threshold, the steps is interrupted, then searh the rule again
 			twmsg(("3"));
 			TempSteps    = 1;
@@ -264,16 +274,14 @@ unsigned long algo_step(unsigned short *buf)
 			_min[i]      = 8192;
 			_bad_flag[i] = 0;
 
-			if (_vpp[i] >= 1600) {					// 1600 --- 6.25g	(experiment value, decided by customer)
-				_precision[i] = _vpp[i] / 320;			// 320  --- 1.25g	(experiment value, decided by customer)
-//			} else if ((_vpp[i] >= 496) && (_vpp[i] < 1600)) {	// 496  --- 1.9375g	(experiment value, decided by customer)
-			} else if ((_vpp[i] >= 256) && (_vpp[i] < 1600)) {	// 256  --- 1.0g
-				_precision[i] = 48;				// 48   --- 0.1875g	(experiment value, decided by customer)
-//			} else if ((_vpp[i] >= 144) && (_vpp[i] < 496))	{	// 144  --- 0.5625g	(experiment value, decided by customer)
-			} else if ((_vpp[i] >=  72) && (_vpp[i] < 256))	{	// 72   --- 0.288g
-				_precision[i] = 32;				// 32   --- 0.125g	(experiment value, decided by customer)
+			if (_vpp[i] >= __ACC_THH) {
+				_precision[i] = _vpp[i] / __ACC_PCS3;
+			} else if ((_vpp[i] >= __ACC_THM) && (_vpp[i] < __ACC_THH)) {
+				_precision[i] = __ACC_PCS2;
+			} else if ((_vpp[i] >= __ACC_THL) && (_vpp[i] < __ACC_THM)) {
+				_precision[i] = __ACC_PCS1;
 			} else {
-				_precision[i] = 16;				// 16   --- 0.064g
+				_precision[i] = __ACC_PCS0;
 				_bad_flag[i]  = 1;
 			}
 		}

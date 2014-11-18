@@ -439,8 +439,8 @@ void batt_isr(void)
  *
  * @brief   Handles all key events for this device.
  *
- * @param   mode - 
- * @param   time - 
+ * @param   mode -
+ * @param   time -
  *
  * @return  none
  */
@@ -1409,10 +1409,18 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 					case MODE_SLEEP:   tmp |= 0x4000; break;
 					}
 					hash_put(&tmp);
-
-					mark.steps = normal.steps;
-					mark.time  = osal_getClock();
 				}
+				mark.time  = osal_getClock();
+#if defined(HAL_IMAGE_A) || defined(HAL_IMAGE_B)
+				if ((mark.time % (24UL*60UL*60UL)) <= (11UL*60UL)) {
+#else
+				if ((mark.time % (24UL*60UL*60UL)) <= (11UL)) {
+#endif
+					dmsg(("reset steps...\n"));
+					normal.steps  = 0;
+					workout.steps = 0;
+				}
+				mark.steps = normal.steps;
 			}
 		}
 

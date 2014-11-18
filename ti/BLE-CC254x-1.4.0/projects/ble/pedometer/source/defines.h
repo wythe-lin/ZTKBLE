@@ -33,26 +33,33 @@ extern "C"
 /*
  *****************************************************************************
  *
- * variables
+ * g-sensor threshold
  *
  *****************************************************************************
  */
+#define GSEN_TH_HIGH				(1600)		// x 0.004g = 6.4g
+//#define GSEN_TH_MEDIUM			(496)		// x 0.004g = 1.984g
+//#define GSEN_TH_LOW				(144)		// x 0.004g = 0.576g
+#define GSEN_TH_MEDIUM				(256)		// x 0.004g = 1.0g
+#define GSEN_TH_LOW				(72)		// x 0.004g = 0.288g
 
+#define GSEN_PRECISION_0			(16)		// x 0.004g = 0.064g
+#define GSEN_PRECISION_1                        (32)		// x 0.004g = 0.125g
+#define GSEN_PRECISION_2                        (48)		// x 0.004g = 0.1875g
+#define GSEN_PRECISION_3                        (320)		// x 0.004g = 1.25g
 
-
-
-
+//#define GSEN_TIMEWINDOW_MIN			(10)		// time window minimum 0.2s
+#define GSEN_TIMEWINDOW_MIN			(12)		// time window minimum 0.3s
+#define GSEN_TIMEWINDOW_MAX			(100)		// time window maximum 2s
 
 
 /*
  *****************************************************************************
  *
- * variables
+ * battery level threshold
  *
  *****************************************************************************
  */
-
-// battery level
 #define BATT_LEVEL_01				(0x1c00)	// 3.7V
 #define BATT_LEVEL_02				(0x1b28)	// 3.6V
 #define BATT_LEVEL_03				(0x1a77)	// 3.5V
@@ -60,7 +67,14 @@ extern "C"
 #define BATT_LEVEL_05				(0x1898)	// 3.3V
 #define BATT_LEVEL_06				(0x16e7)	// 3.1V
 
-// how often to perform something (milliseconds)
+
+/*
+ *****************************************************************************
+ *
+ * how often to perform something (milliseconds)
+ *
+ *****************************************************************************
+ */
 #define PERIOD_MODE_SWITCH			(1000*2)	// mode switch
 #define PERIOD_MODE_SLEEP			(1000*4)	// into sleep mode
 #define PERIOD_CALIB				(1000*6)	// g-sensor calibration
@@ -69,6 +83,7 @@ extern "C"
 #define PERIOD_RTC				(1000*1)	// real time clock
 #define PERIOD_CHARGE_DEBOUNCE			(1000/1)	// battery charge detect debounce
 
+// seconds
 #define TIME_PWRON				(1)		// power on
 #define TIME_OLED_OFF				(5)		// oled off
 #define TIME_GSEN_OFF				(5)		// g-sensor off
