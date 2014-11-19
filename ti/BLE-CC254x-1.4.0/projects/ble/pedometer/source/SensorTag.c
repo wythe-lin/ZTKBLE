@@ -427,6 +427,23 @@ static unsigned char batt_get_level(void)
 	return batt_level;
 }
 
+static unsigned char batt_precision(void)
+{
+	unsigned char	precision;
+
+	switch (batt_get_level()) {
+	case 7:	precision = 100; break;
+	case 6:	precision = 100; break;
+	case 5:	precision =  80; break;
+	case 4:	precision =  60; break;
+	case 3:	precision =  40; break;
+	case 2:	precision =  20; break;
+	case 1:	precision =   0; break;
+	case 0:	precision =   0; break;
+	}
+	return precision;
+}
+
 void batt_isr(void)
 {
 	osal_start_timerEx(sensorTag_TaskID, EVT_CHARGING, PERIOD_CHARGE_DEBOUNCE);
@@ -462,6 +479,39 @@ static unsigned char pwmgr_saving_timer(void)
 
 	power_saving--;
 	return 0;
+}
+
+
+/**
+ * @fn      
+ *
+ * @brief   
+ *
+ * @param   
+ * @param
+ *
+ * @return
+ */
+// step x stride
+static unsigned long calc_distance(unsigned long steps, unsigned char stride)
+{
+	unsigned long	distance;
+
+	distance = (steps * stride) / 100UL;	// unit: meter
+//	dmsg(("distance=%0ldm\n", distance));
+	return distance;
+}
+
+// weight x distance x (1.036)
+static unsigned short calc_calorie(unsigned long distance, unsigned char weight)
+{
+	float		tmp;
+	unsigned short	calorie;
+
+	tmp     = ((float) (normal.distance * pi.weight) / 1000.0) * COEF_CALORIE;
+	calorie = (unsigned short) tmp;
+//	dmsg(("calorie=%0d, %0.2fKcal\n", calorie, tmp));
+	return calorie;
 }
 
 
@@ -542,6 +592,7 @@ static void sensorTag_HandleKeys(uint8 shift, uint8 keys)
 		}
 
 		// find the current GAP advertising status
+		Batt_SetLevel(batt_precision());
 		GAPRole_GetParameter(GAPROLE_ADVERT_ENABLED, &current_adv_status);
 		if ((current_adv_status == FALSE) && (gapProfileState != GAPROLE_CONNECTED)) {
 			current_adv_status = TRUE;
@@ -718,15 +769,11 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 		}
 		// display calorie
 		oled_set_font(&num8x16);
-#if !defined(HAL_IMAGE_A)
 		if ((mode & 0xF0) == MODE_NORMAL) {
 			oled_draw_num(1, 0, normal.calorie);
 		} else {
 			oled_draw_num(1, 0, workout.calorie);
 		}
-#else
-		oled_draw_icon(1, 0, 0);
-#endif
 		break;
 
 	case MODE_DISTANCE:
@@ -739,15 +786,11 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 		}
 		// display distance
 		oled_set_font(&num8x16);
-#if !defined(HAL_IMAGE_A)
 		if ((mode & 0xF0) == MODE_NORMAL) {
 			oled_draw_num(1, 0, normal.distance);
 		} else {
 			oled_draw_num(1, 0, workout.distance);
 		}
-#else
-		oled_draw_icon(1, 0, 0);
-#endif
 		break;
 
 	case MODE_DBG:
@@ -899,8 +942,8 @@ static char SensorTag_PktParsing(pt_t *pkt)
 			for (i=0; i<len; i++) {
 				src = (unsigned short *) hash_get();
 				if ((*src & 0xC000) != 0xC000) {
-					distance = ((*src & 0x3FFF) * pi.stride) / 100UL;
-					calorie  = (unsigned short) ((float) (distance  / 1000UL * pi.weight) * 1.036);
+					distance = calc_distance((*src & 0x3FFF), pi.stride);
+					calorie  = calc_calorie(distance, pi.weight);
 //					distance = 0x0202;
 //					calorie  = 0x0101;
 				} else {
@@ -911,12 +954,12 @@ static char SensorTag_PktParsing(pt_t *pkt)
 //					calorie  = 0x0304;
 //					distance = 0x0506;
 				}
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+0] = HI_UINT16(*src);
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+1] = LO_UINT16(*src);
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+2] = HI_UINT16(calorie);
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+3] = LO_UINT16(calorie);
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+4] = HI_UINT16(distance);
-				pkt->rsp.get_week_ssdcg_ok.info[i*6+5] = LO_UINT16(distance);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+0] = HI_UINT16(calorie);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+1] = LO_UINT16(calorie);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+2] = HI_UINT16(distance);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+3] = LO_UINT16(distance);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+4] = HI_UINT16(*src);
+				pkt->rsp.get_week_ssdcg_ok.info[i*6+5] = LO_UINT16(*src);
 			}
 			pkt->rsp.get_week_ssdcg_ok.chksum  = ptProfile_CalcChksum(pkt->header.len, pkt->header.ptr);
 #else
@@ -1374,10 +1417,10 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 #endif
 		}
 
-		normal.distance  =  (normal.steps * pi.stride) / 100UL;
-		workout.distance = ((normal.steps - workout.steps) * pi.stride) / 100UL;
-		normal.calorie   = (unsigned short) ((float) (normal.distance  / 1000UL * pi.weight) * 1.036);
-		workout.calorie  = (unsigned short) ((float) (workout.distance / 1000UL * pi.weight) * 1.036);
+		normal.distance  = calc_distance(normal.steps, pi.stride);
+		workout.distance = calc_distance((normal.steps - workout.steps), pi.stride);
+		normal.calorie   = calc_calorie(normal.distance, pi.weight);
+		workout.calorie  = calc_calorie(workout.distance, pi.weight);
 		return (events ^ EVT_GSNINT2);
 	}
 
@@ -1397,9 +1440,9 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 		// record data
 		if ((pwmgr != PWMGR_S5) && (pwmgr != PWMGR_S6)) {
 #if defined(HAL_IMAGE_A) || defined(HAL_IMAGE_B)
-			if ((osal_getClock() - mark.time) >= (10UL*60UL)) {
+			if ((osal_getClock() - mark.time) >= (12UL*60UL)) {
 #else
-			if ((osal_getClock() - mark.time) >= (10UL)) {
+			if ((osal_getClock() - mark.time) >= (12UL)) {
 #endif
 				if (!hash_is_full()) {
 					unsigned short	tmp = normal.steps - mark.steps;
@@ -1412,9 +1455,9 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 				}
 				mark.time  = osal_getClock();
 #if defined(HAL_IMAGE_A) || defined(HAL_IMAGE_B)
-				if ((mark.time % (24UL*60UL*60UL)) <= (11UL*60UL)) {
+				if ((mark.time % (24UL*60UL*60UL)) <= (13UL*60UL)) {
 #else
-				if ((mark.time % (24UL*60UL*60UL)) <= (11UL)) {
+				if ((mark.time % (24UL*60UL*60UL)) <= (13UL)) {
 #endif
 					dmsg(("reset steps...\n"));
 					normal.steps  = 0;

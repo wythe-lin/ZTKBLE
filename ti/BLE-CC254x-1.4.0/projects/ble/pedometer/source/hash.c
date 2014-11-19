@@ -123,7 +123,7 @@ void hash_rst(void)
 	unsigned short	i;
 
 	for (i=0; i<HASHTBL_MAXSZ; i++) {
-//		ptdb.sa[i] = i;
+//		ptdb.sa[i] = 1;
 		ptdb.sa[i] = 0xc000;
 	}
 	hash_len = 0;
