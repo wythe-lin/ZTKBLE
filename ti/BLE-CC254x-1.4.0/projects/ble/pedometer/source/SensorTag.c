@@ -508,7 +508,7 @@ static unsigned short calc_calorie(unsigned long distance, unsigned char weight)
 	float		tmp;
 	unsigned short	calorie;
 
-	tmp     = ((float) (normal.distance * pi.weight) / 1000.0) * COEF_CALORIE;
+	tmp     = ((float) (distance * weight) / 1000.0) * COEF_CALORIE;
 	calorie = (unsigned short) tmp;
 //	dmsg(("calorie=%0d, %0.2fKcal\n", calorie, tmp));
 	return calorie;
