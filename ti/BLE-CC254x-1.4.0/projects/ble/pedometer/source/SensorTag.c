@@ -1462,6 +1462,7 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 					dmsg(("reset steps...\n"));
 					normal.steps  = 0;
 					workout.steps = 0;
+					STEPS         = 0;
 				}
 				mark.steps = normal.steps;
 			}

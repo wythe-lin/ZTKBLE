@@ -52,6 +52,8 @@ extern "C"
 #define GSEN_TIMEWINDOW_MIN			(12)		// time window minimum 0.3s
 #define GSEN_TIMEWINDOW_MAX			(100)		// time window maximum 2s
 
+#define GSEN_SAMPLING_FREQ			(25)		// g-sensor sampling frequency
+
 
 /*
  *****************************************************************************

@@ -26,6 +26,7 @@
 #include <hal_i2c.h>
 #include <osal.h>
 
+#include "defines.h"
 #include "sensorTag.h"
 #include "adxl345.h"
 
@@ -211,7 +212,7 @@ void adxl345_sampling(unsigned char rate)
 	}
 	adxl345_reg_write(XL345_INT_MAP,     XL345_WATERMARK);						// INT_MAP: water mark interrupt to the INT2 pin
 	adxl345_reg_write(XL345_DATA_FORMAT, XL345_INT_LOW | XL345_FULL_RESOLUTION | XL345_RANGE_2G);	// data format: 2g range, 256->1g
-	adxl345_reg_write(XL345_FIFO_CTL,    XL345_FIFO_MODE_FIFO | 10);				// FIFO_CTL: FIFO mode, samples = 10 
+	adxl345_reg_write(XL345_FIFO_CTL,    XL345_FIFO_MODE_FIFO | GSEN_SAMPLING_FREQ);		// FIFO_CTL: FIFO mode, samples = GSEN_SAMPLING_FREQ
 	adxl345_reg_write(XL345_POWER_CTL,   XL345_MEASURE);						// POWER_CTL: measure mode
 
 	GSINT_IEN |= GSINT_IENBIT;
