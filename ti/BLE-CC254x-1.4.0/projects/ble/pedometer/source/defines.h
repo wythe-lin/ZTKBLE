@@ -62,14 +62,19 @@ extern "C"
  *
  *****************************************************************************
  */
-#define BATT_LEVEL_01				(0x1c00)	// 3.7V
-#define BATT_LEVEL_02				(0x1b28)	// 3.6V
-#define BATT_LEVEL_03				(0x1a77)	// 3.5V
-#define BATT_LEVEL_04				(0x1944)	// 3.4V
-#define BATT_LEVEL_05				(0x1898)	// 3.3V
-#define BATT_LEVEL_06				(0x16e7)	// 3.1V
+//#define BATT_LEVEL_01				(0x1c00)	// 3.7V
+//#define BATT_LEVEL_02				(0x1b28)	// 3.6V
+//#define BATT_LEVEL_03				(0x1a77)	// 3.5V
+//#define BATT_LEVEL_04				(0x1944)	// 3.4V
+//#define BATT_LEVEL_05				(0x1898)	// 3.3V
+//#define BATT_LEVEL_06				(0x16e7)	// 3.1V
 
-
+#define BATT_LEVEL_01				(0x1d00)	// 3.9V
+#define BATT_LEVEL_02				(0x1c00)	// 3.7V
+#define BATT_LEVEL_03				(0x1b00)	// 3.6V
+#define BATT_LEVEL_04				(0x1a00)	// 3.5V
+#define BATT_LEVEL_05				(0x1900)	// 3.4V
+#define BATT_LEVEL_06				(0x1800)	// 3.2V
 /*
  *****************************************************************************
  *
