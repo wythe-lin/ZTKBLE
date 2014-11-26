@@ -49,7 +49,7 @@ extern const struct font_def	*font;
 extern const struct font_def	fonts7x8;
 extern const struct font_def	num8x16;
 extern const struct font_def	icon16x16;
-
+extern const struct font_def	bigbatt40x32;
 
 
 #ifdef __cplusplus

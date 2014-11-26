@@ -644,31 +644,47 @@ static void sensorTag_BattDisp(unsigned char level)
 	oled_set_font(&icon16x16);
 	switch (level) {
 	case 7:	// battery charge
-		switch (charge_icon) {
-		case 0:	oled_draw_icon(2, 44,  7);	break;
-		case 1:	oled_draw_icon(2, 44,  8);	break;
-		case 2:	oled_draw_icon(2, 44,  9);	break;
-		case 3:	oled_draw_icon(2, 44, 10);	break;
-		case 4:	oled_draw_icon(2, 44, 11);	break;
-		case 5:	oled_draw_icon(2, 44, 12);	break;
-		}
 		if (charge_cnt < 3) {
 			charge_cnt++;
 		} else {
 			charge_cnt = 0;
-			if (++charge_icon > 5) {
-				charge_icon = 0;
+			if (pwmgr == PWMGR_S1) {
+				switch (charge_icon) {
+				case 0:	oled_draw_icon(2, 44,  7); break;
+				case 1:	oled_draw_icon(2, 44,  8); break;
+				case 2:	oled_draw_icon(2, 44,  9); break;
+				case 3:	oled_draw_icon(2, 44, 10); break;
+				case 4:	oled_draw_icon(2, 44, 11); break;
+				case 5:	oled_draw_icon(2, 44, 12); break;
+				}
+				if (++charge_icon > 5) {
+					charge_icon = 0;
+				}
+			} else {
+				oled_set_font(&bigbatt40x32);
+				switch (charge_icon) {
+				case 0:	oled_draw_icon(0, 12, 0); break;
+				case 1:	oled_draw_icon(0, 12, 1); break;
+				case 2:	oled_draw_icon(0, 12, 2); break;
+				case 3:	oled_draw_icon(0, 12, 3); break;
+				}
+				if (++charge_icon > 3) {
+					charge_icon = 0;
+				}
 			}
 		}
 		break;
 
-	case 6:	oled_draw_icon(2, 44, 12);	break;	// battery full
-	case 5:	oled_draw_icon(2, 44, 11);	break;
-	case 4:	oled_draw_icon(2, 44, 10);	break;
-	case 3:	oled_draw_icon(2, 44,  9);	break;
-	case 2:	oled_draw_icon(2, 44,  8);	break;
-	case 1:	oled_draw_icon(2, 44,  7);	break;	// battery empty
-	case 0:	oled_draw_icon(2, 44, 13);	break;	// battery shutdown
+	case 6:	oled_draw_icon(2, 44, 12); break;	// battery full
+	case 5:	oled_draw_icon(2, 44, 11); break;
+	case 4:	oled_draw_icon(2, 44, 10); break;
+	case 3:	oled_draw_icon(2, 44,  9); break;
+	case 2:	oled_draw_icon(2, 44,  8); break;
+	case 1:	oled_draw_icon(2, 44,  7); break;	// battery empty
+	case 0:	// battery shutdown
+		oled_set_font(&bigbatt40x32);
+		oled_draw_icon(0, 12, 4);
+		break;
 	}
 }
 
@@ -722,7 +738,7 @@ static void sensorTag_HandleDisp(unsigned char mode, void *p)
 
 			// display clock icon
 			oled_set_font(&icon16x16);
-			oled_draw_icon(0, 44, 14);
+			oled_draw_icon(0, 44, 13);
 
 		} else {
 			// display chronograph
