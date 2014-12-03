@@ -103,13 +103,13 @@ unsigned long		STEPS = 0;				// new steps
 
 static unsigned char	samples = 0;				// record the sample times
 
-static unsigned char	interval     = 0;			// Record the interval of a Step
-static unsigned char	TempSteps    = 0;			// Record the Temp Steps
-static unsigned char	InvalidSteps = 0;			// Record the Invalid Steps
-static unsigned char	ReReg        = 2;			// Flag for Rule
-								// 2 - New Begin
-								// 1 - Have Begun, But Do not Find the Rule
-								// 0 - Have Found the Rule
+static unsigned char	interval     = 0;			// Record the interval of a step
+static unsigned char	TempSteps    = 0;			// Record the temp steps
+static unsigned char	InvalidSteps = 0;			// Record the invalid steps
+static unsigned char	rule         = 2;			// flag for rule
+								// 2 - New begin
+								// 1 - Have begin, but do not find the rule
+								// 0 - Have found the rule
 
 /*
  ******************************************************************************
@@ -125,93 +125,155 @@ static unsigned char	ReReg        = 2;			// Flag for Rule
  */
 static void time_window(char n)
 {
-	
-	twmsg(("\033[1;36m[twin] "));
-	switch (n) {
-	case 0:	twmsg(("x: "));	break;
-	case 1:	twmsg(("y: "));	break;
-	case 2:	twmsg(("z: "));	break;
-	}
-	twmsg(("%02d - ", ReReg));
+	twmsg(("\033[1;36m[twin] %s: ", (n==0) ? "x" : (n==1) ? "y" : "z"));
+	twmsg(("(rule=%0d, interval=%03d) - ", rule, interval));
 
-	if (ReReg == 2)	{
-		// if it is the first step, add TempStep directly
-		twmsg(("a"));
+	switch (rule) {
+	case 2:	// if it is the first step, add TempStep directly
+		twmsg(("start"));
 		TempSteps++;
-		interval     = 0;
 		InvalidSteps = 0;
-		ReReg        = 1;
+		interval     = 0;
+		rule         = 1;
+		break;
 
-	} else {
-		// if it is not the first step, process as below
-		twmsg(("b"));
+	case 1:
 		if ((interval >= __ACC_TWIN_MIN) && (interval <= __ACC_TWIN_MAX)) {
-			// if the step interval in the time window
-			twmsg(("1"));
-			InvalidSteps = 0;
-			if (ReReg == 1) {
-				// if still not find the rule
-				twmsg(("A"));
-				TempSteps++;				// make TempSteps add one
-				if (TempSteps >= REGULATION) {
-					// if TempSteps reach the regulation number
-					STEPS     = STEPS + TempSteps;	// Update STEPS
-//					STEPS     = STEPS + 1;		// Update STEPS
-					TempSteps = 0;
-					ReReg     = 0;			// Have found the rule
-				}
-				interval = 0;
-
-			} else if (ReReg == 0) {
-				// if have found the rule, Updata STEPS directly
-				twmsg(("B"));
-				STEPS++;
+			// if still not find the rule
+			twmsg(("min < t < max"));
+			TempSteps++;				// make TempSteps add one
+			if (TempSteps >= REGULATION) {
+				// if TempSteps reach the regulation number
+				twmsg((", TempSteps >= %0d", REGULATION));
+				STEPS     = STEPS + TempSteps;	// Update STEPS
+//				STEPS     = STEPS + 1;		// Update STEPS
 				TempSteps = 0;
-				interval  = 0;
+				rule      = 0;			// Have found the rule
 			}
 
 		} else if (interval < __ACC_TWIN_MIN) {
-			// if time interval less than the time window under threshold
-			twmsg(("2"));
-			if (ReReg == 0) {
-				twmsg(("C"));
-				// if have found the rule
-				if (InvalidSteps < 255) {
-					InvalidSteps++;			// make InvalidSteps add one
-				}
+			// if have not found the rule, the process looking for rule before is invalid, then search the rule again
+			twmsg(("t < min"));
+			TempSteps = 1;
 
-				if (InvalidSteps >= INVALID) {
-					// if InvalidSteps reach the INVALID number, search the rule again
-					twmsg(("E"));
-					TempSteps    = 1;
-					interval     = 0;
-					InvalidSteps = 0;
-					ReReg        = 1;
+		} else if (interval > __ACC_TWIN_MAX) {
+			// if the interval more than upper threshold, the steps is interrupted, then searh the rule again
+			twmsg(("t > max"));
+			TempSteps = 1;
+		}
+		InvalidSteps = 0;
+		interval     = 0;
+		break;
 
-				} else {
-					// otherwise, just discard this step
-					twmsg(("F"));
-					interval = 0;
-				}
+	case 0:
+		if ((interval >= __ACC_TWIN_MIN) && (interval <= __ACC_TWIN_MAX)) {
+			// if have found the rule, update STEPS directly
+			twmsg(("min < t < max"));
+			STEPS++;
+			TempSteps    = 0;
+			InvalidSteps = 0;
 
-			} else if (ReReg == 1) {
-				twmsg(("D"));
-				// if have not found the rule, the process looking for rule before is invalid, then search the rule again
+		} else if (interval < __ACC_TWIN_MIN) {
+			// if have found the rule
+			twmsg(("t < min"));
+			InvalidSteps++;				// make InvalidSteps add one
+			if (InvalidSteps >= INVALID) {
+				// if InvalidSteps reach the INVALID number, search the rule again
+				twmsg((", InvalidSteps >= %0d", INVALID));
 				TempSteps    = 1;
-//				interval     = 0;
 				InvalidSteps = 0;
-				ReReg        = 1;
+				rule         = 1;
 			}
 
 		} else if (interval > __ACC_TWIN_MAX) {
 			// if the interval more than upper threshold, the steps is interrupted, then searh the rule again
-			twmsg(("3"));
+			twmsg(("t > max"));
 			TempSteps    = 1;
-			interval     = 0;
 			InvalidSteps = 0;
-			ReReg        = 1;
+			rule         = 1;
 		}
+		interval = 0;
+		break;
 	}
+
+
+//	if (rule == 2)	{
+//		// if it is the first step, add TempStep directly
+//		twmsg(("(start)"));
+//		TempSteps++;
+//		interval     = 0;
+//		InvalidSteps = 0;
+//		rule         = 1;
+//
+//	} else {
+//		// if it is not the first step, process as below
+//		if ((interval >= __ACC_TWIN_MIN) && (interval <= __ACC_TWIN_MAX)) {
+//			// if the step interval in the time window
+//			twmsg(("(min <= interval <= max)"));
+//			InvalidSteps = 0;
+//			if (rule == 1) {
+//				// if still not find the rule
+//				twmsg(("A"));
+//				TempSteps++;				// make TempSteps add one
+//				if (TempSteps >= REGULATION) {
+//					// if TempSteps reach the regulation number
+//					STEPS     = STEPS + TempSteps;	// Update STEPS
+////					STEPS     = STEPS + 1;		// Update STEPS
+//					TempSteps = 0;
+//					rule      = 0;			// Have found the rule
+//				}
+//				interval = 0;
+//
+//			} else if (rule == 0) {
+//				// if have found the rule, Update STEPS directly
+//				twmsg(("B"));
+//				STEPS++;
+//				TempSteps = 0;
+//				interval  = 0;
+//			}
+//
+//		} else if (interval < __ACC_TWIN_MIN) {
+//			// if time interval less than the time window under threshold
+//			twmsg(("interval < min"));
+//			if (rule == 0) {
+//				twmsg(("C"));
+//				// if have found the rule
+//				if (InvalidSteps < 255) {
+//					InvalidSteps++;			// make InvalidSteps add one
+//				}
+//
+//				if (InvalidSteps >= INVALID) {
+//					// if InvalidSteps reach the INVALID number, search the rule again
+//					twmsg(("E"));
+//					TempSteps    = 1;
+//					interval     = 0;
+//					InvalidSteps = 0;
+//					rule         = 1;
+//
+//				} else {
+//					// otherwise, just discard this step
+//					twmsg(("F"));
+//					interval = 0;
+//				}
+//
+//			} else if (rule == 1) {
+//				twmsg(("D"));
+//				// if have not found the rule, the process looking for rule before is invalid, then search the rule again
+//				TempSteps    = 1;
+//				interval     = 0;
+//				InvalidSteps = 0;
+//				rule         = 1;
+//			}
+//
+//		} else if (interval > __ACC_TWIN_MAX) {
+//			// if the interval more than upper threshold, the steps is interrupted, then searh the rule again
+//			twmsg(("interval > max"));
+//			TempSteps    = 1;
+//			interval     = 0;
+//			InvalidSteps = 0;
+//			rule         = 1;
+//		}
+//	}
 
 	twmsg(("\n\033[0m"));
 }
@@ -285,11 +347,11 @@ unsigned long algo_step(unsigned short *buf)
 				_bad_flag[i]  = 1;
 			}
 		}
-
+/*
 		dmsg(("[x]: vpp=%04x p=%02x fg=%02x, ", _vpp[X_CHANNEL], _precision[X_CHANNEL], _bad_flag[X_CHANNEL]));
 		dmsg(("[y]: vpp=%04x p=%02x fg=%02x, ", _vpp[Y_CHANNEL], _precision[Y_CHANNEL], _bad_flag[Y_CHANNEL]));
 		dmsg(("[z]: vpp=%04x p=%02x fg=%02x\n", _vpp[Z_CHANNEL], _precision[Z_CHANNEL], _bad_flag[Z_CHANNEL]));
-
+*/
 	}
 
 	/* Linear Shift Register */
@@ -307,17 +369,14 @@ unsigned long algo_step(unsigned short *buf)
 			}
 		}
 	}
-	/*for (i=X_CHANNEL; i<=Z_CHANNEL; i++) {
-		switch (i) {
-		case X_CHANNEL:	dmsg(("x: "));	break;
-		case Y_CHANNEL:	dmsg(("y: "));	break;
-		case Z_CHANNEL:	dmsg(("z: "));	break;
-		}
-		dmsg(("sample old=%05d, new=%05d\n", _sample_old[i], _sample_new[i]));
-	}*/
+/*
+	dmsg(("[x]: sample old=%05d, new=%05d\n", _sample_old[X_CHANNEL], _sample_new[X_CHANNEL]));
+	dmsg(("[y]: sample old=%05d, new=%05d\n", _sample_old[Y_CHANNEL], _sample_new[Y_CHANNEL]));
+	dmsg(("[z]: sample old=%05d, new=%05d\n", _sample_old[Z_CHANNEL], _sample_new[Z_CHANNEL]));
+*/
 
 	/* judgement of dynamic threshold */
-	if (interval < 0xFF) {
+	if (interval < 255) {
 		interval++;
 	}
 

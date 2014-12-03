@@ -1380,8 +1380,8 @@ uint16 SensorTag_ProcessEvent(uint8 task_id, uint16 events)
 	if (events & EVT_SYSRST) {
 		if (key1_press) {
 			fmsg(("\033[40;32m[system reset]\033[0m\n"));
-//			HAL_SYSTEM_RESET();
-			adxl345_self_calibration();
+			HAL_SYSTEM_RESET();
+//			adxl345_self_calibration();
 		}
 		return (events ^ EVT_SYSRST);
 	}
