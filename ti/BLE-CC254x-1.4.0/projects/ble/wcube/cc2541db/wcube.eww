@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+
+<workspace>
+  <project>
+    <path>$WS_DIR$\wcube.ewp</path>
+  </project>
+  <batchBuild>
+    <batchDefinition>
+      <name>ALL</name>
+      <member>
+        <project>wCube</project>
+        <configuration>CC2541DK-wCube</configuration>
+      </member>
+      <member>
+        <project>wCube</project>
+        <configuration>CC2541DK-wCube-OAD-ImgA</configuration>
+      </member>
+      <member>
+        <project>wCube</project>
+        <configuration>CC2541DK-wCube-OAD-ImgB</configuration>
+      </member>
+    </batchDefinition>
+  </batchBuild>
+</workspace>
+
+
