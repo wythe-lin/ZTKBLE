@@ -808,7 +808,7 @@
         </option>
         <option>
           <name>XclFile</name>
-          <state>$PROJ_DIR$\..\..\common\cc2540\ti_51ew_cc2540b.xcl</state>
+          <state>$PROJ_DIR$\ti_51ew_cc2540f128b.xcl</state>
         </option>
         <option>
           <name>XclFileSlave</name>
@@ -3270,6 +3270,9 @@
   </configuration>
   <group>
     <name>APP</name>
+    <file>
+      <name>$PROJ_DIR$\..\source\dbglock.c</name>
+    </file>
     <file>
       <name>$PROJ_DIR$\..\source\gplink.c</name>
     </file>
