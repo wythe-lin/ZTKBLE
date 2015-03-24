@@ -84,8 +84,8 @@ typedef struct {
 
 // packet format
 typedef union {
-	unsigned char	buf[200];	/* max size */
-
+	unsigned char		buf[200];	/* max size */
+	uartpkt_leading_t	header;
 } uartpkt_t;
 
 

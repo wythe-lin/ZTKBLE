@@ -3271,6 +3271,9 @@
   <group>
     <name>APP</name>
     <file>
+      <name>$PROJ_DIR$\..\source\gplink.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\source\osal_wcube.c</name>
     </file>
     <file>

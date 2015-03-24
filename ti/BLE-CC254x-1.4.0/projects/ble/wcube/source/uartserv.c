@@ -120,7 +120,7 @@ static CONST gattAttrType_t	uartServ1 = { ATT_BT_UUID_SIZE, uartServ1UUID };
 
 // Characteristic Properties, Value, User Description
 static uint8			uartServ1CharProps        = GATT_PROP_WRITE;
-uartpkt_t			uartPkt;
+uartpkt_t			uartpkt;
 static uint8			uartServ1CharUserDesp[17] = "Write\0";
 
 /*
@@ -161,7 +161,7 @@ static gattAttribute_t		uartServ1AttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] = {
 		{ ATT_BT_UUID_SIZE, uartServ1CharUUID },
 		GATT_PERMIT_WRITE,
 		0,
-		(unsigned char *) &uartPkt
+		(unsigned char *) &uartpkt
 	},
 
 	// User Description
@@ -196,7 +196,7 @@ static gattAttribute_t		uartServ2AttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] = {
 		{ ATT_BT_UUID_SIZE, uartServ2CharUUID },
 		GATT_PERMIT_READ,
 		0,
-		(unsigned char *) &uartPkt
+		(unsigned char *) &uartpkt
 	},
 
 	// Configuration
@@ -242,7 +242,6 @@ static unsigned char	rxofs = 0;
 static bStatus_t uartServ1_WriteAttrCB(uint16 connHandle, gattAttribute_t *pAttr, uint8 *pValue, uint8 len, uint16 offset)
 {
 	bStatus_t	status = SUCCESS;
-	uint8		notifyApp = 0xFF;
 
 	dmsg(("\033[40;31m0xFFE9 (Write)\033[0m\n"));
 
@@ -258,16 +257,10 @@ static bStatus_t uartServ1_WriteAttrCB(uint16 connHandle, gattAttribute_t *pAttr
 
 		switch (uuid) {
 		case UARTSERV1_CHAR_UUID:
-			if (rxlen == 0) {
-				rxlen = pValue[1] + 3;
-				rxofs = 0;
-			}
-			osal_memcpy(pAttr->pValue+rxofs, pValue, len);
+			osal_memcpy(pAttr->pValue, pValue, len);
 
-			rxofs += len;
-			if (rxlen <= rxofs) {
-				rxlen     = 0;
-				notifyApp = UARTSERV1_CHAR;
+			if (uartServ1_AppCBs) {
+				uartServ1_AppCBs(UARTSERV1_CHAR);
 			}
 			break;
 
@@ -282,9 +275,6 @@ static bStatus_t uartServ1_WriteAttrCB(uint16 connHandle, gattAttribute_t *pAttr
 		status = ATT_ERR_INVALID_HANDLE;
 	}
 
-	if ((notifyApp != 0xFF) && uartServ1_AppCBs) {
-		uartServ1_AppCBs(notifyApp);
-	}
 	return (status);
 }
 
@@ -481,8 +471,8 @@ bStatus_t uartServ1_GetParameter(uint8 param, void *value)
 			uint8	i;
 			uint8	*pValue = (uint8 *) value;
 
-			dmsg(("[OUT]: "));
-			for (i=0; i<pValue[1]+3; i++) {
+			dmsg(("[OUT]:"));
+			for (i=0; i<pValue[1]; i++) {
 				dmsg((" %02x", pValue[i]));
 			}
 			dmsg(("\n"));
@@ -522,7 +512,7 @@ bStatus_t uartServ2_SetParameter(uint8 param, uint8 len, void *value)
 			uint8	*pValue = (uint8 *) value;
 			uint8	displen = (len < 16) ? len : 16;
 
-			dmsg(("[IN]: "));
+			dmsg(("[IN]:"));
 			for (i=0; i<displen; i++) {
 				dmsg((" %02x", pValue[i]));
 			}

@@ -78,6 +78,7 @@
 
 // Sensor drivers
 #include "wcube.h"
+#include "gplink.h"
 
 #include "defines.h"
 
@@ -539,12 +540,43 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
  *
  * @return
  */
-static char wCube_PktParsing(uartpkt_t *pkt)
+static char uartServPktParsing(uartpkt_t *pkt)
 {
-	char		ret = 1;
+	char		i;
+	unsigned char	len    = pkt->header.len;
+	unsigned char	cmd    = pkt->header.command;
+	unsigned char	chksum = 0;
 
+	// check checksum
+	for (i=1; i<len-2; i++) {
+		chksum += pkt->buf[i];
+	}
+	if (chksum != pkt->buf[len-2]) {
 
-	return ret;
+		return 0;
+	}
+
+	// packet parsing
+	switch (cmd) {
+	case SET_DATE:
+		dmsg(("<app->ble>: set date\n"));
+		dmsg(("current date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
+
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case RECORD_START:
+		dmsg(("<app->ble>: record start\n"));
+		dmsg(("resolution:%02d power:%02d speed:%02d\n", pkt->buf[3], pkt->buf[4], pkt->buf[5]));
+
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	default:
+		dmsg(("Unknown command\n"));
+		return 0;
+	}
+	return 1;
 }
 
 
@@ -560,8 +592,12 @@ static char wCube_PktParsing(uartpkt_t *pkt)
 static void uartServ1ChgCB(uint8 paramID)
 {
 	switch (paramID) {
+	case UARTSERV1_CHAR:
+		uartServ1_GetParameter(UARTSERV1_CHAR, &uartpkt);
+		uartServPktParsing(&uartpkt);
 
-          
+		break;
+
 	default:
 		// should not reach here!
 		break;
@@ -699,6 +735,7 @@ void wCube_Init(uint8 task_id)
 
 	// Initialise UART
 	uart_init();
+	gplink_init();
 
 	// Initialise sensor drivers
 
