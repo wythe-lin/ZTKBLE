@@ -61,7 +61,7 @@ extern "C"
 typedef enum {
 	SET_DATE			= 0x10,
 	RECORD_START			= 0x01,
-	RECORD_STOP			= 0x05,
+	RECORD_STOP			= 0x11,
 	SNAPSHOT			= 0x02,
 	READ_STATUS			= 0x03,
 	INQUIRY_PIC			= 0x21,

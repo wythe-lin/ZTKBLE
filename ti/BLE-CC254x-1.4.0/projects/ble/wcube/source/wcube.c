@@ -263,8 +263,6 @@ static uint8		attDeviceName[] = "ZT-3000";
 // sensor state variables
 static bool		key1_press	= FALSE;
 
-static unsigned char	batt_level;
-
 
 
 
@@ -351,6 +349,7 @@ static unsigned char wCube_CalcWeek(UTCTimeStruct *t)
 static unsigned char batt_measure(void)
 {
 	unsigned short	adc;
+	unsigned char	batt_level;
 
 	// configure ADC and perform a read
 	HalAdcSetReference(HAL_ADC_REF_125V);
@@ -379,14 +378,9 @@ static unsigned char batt_measure(void)
 
 static unsigned char batt_get_level(void)
 {
-	return batt_level;
-}
-
-static unsigned char batt_precision(void)
-{
 	unsigned char	precision;
 
-	switch (batt_get_level()) {
+	switch (batt_measure()) {
 	case 7:	precision = 100; break;
 	case 6:	precision = 100; break;
 	case 5:	precision =  80; break;
@@ -540,6 +534,10 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
  *
  * @return
  */
+static char	*resul[] = { "full HD", "HD", "VGA", "QVGA", "CIF", "QCIF" };
+static char	*speed[] = { "1x", "2x", "3x", "4x" }; 
+static char	*power[] = { "50Hz", "60Hz" };
+
 static char uartServPktParsing(uartpkt_t *pkt)
 {
 	char		i;
@@ -561,14 +559,17 @@ static char uartServPktParsing(uartpkt_t *pkt)
 	case SET_DATE:
 		dmsg(("<app->ble>: set date\n"));
 		dmsg(("current date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
-
 		gplink_send_pkt(pkt, len);
 		return 1;
 
 	case RECORD_START:
 		dmsg(("<app->ble>: record start\n"));
-		dmsg(("resolution:%02d power:%02d speed:%02d\n", pkt->buf[3], pkt->buf[4], pkt->buf[5]));
+		dmsg(("resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
+		gplink_send_pkt(pkt, len);
+		return 1;
 
+	case RECORD_STOP:
+		dmsg(("<app->ble>: record stop\n"));
 		gplink_send_pkt(pkt, len);
 		return 1;
 
@@ -852,6 +853,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 		// performed once per second
 
 		dmsg(("."));
+		Batt_SetLevel(batt_get_level());
 		return (events ^ EVT_RTC);
 	}
 
