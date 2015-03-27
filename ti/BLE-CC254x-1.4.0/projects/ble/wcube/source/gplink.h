@@ -57,9 +57,9 @@ extern "C"
  * API Functions
  ******************************************************************************
  */
-extern void	gplink_init(void);
-extern void	gplink_send_pkt(const void *src, unsigned char len);
-
+extern void		gplink_init(void);
+extern void		gplink_send_pkt(const void *src, unsigned char len);
+extern unsigned char	gplink_recv_pkt(void *buf, unsigned char *fsm);
 
 
 

@@ -35,6 +35,7 @@
 #include "OSAL.h"
 #include "gplink.h"
 
+#include "wcube.h"
 
 /*
  *****************************************************************************
@@ -304,10 +305,8 @@ void gplink_init(void)
 	U1CSR      |=  (1 << 6);
 
 	// interrupt
-	IEN2	   |=  (1 << 3);
-
-	URX1IE	    =  1;
-//	URX1IE	    =  0;
+	IEN2	   |=  (1 << 3);	// tx
+	URX1IE	    =  1;		// rx
 }
 
 
@@ -327,11 +326,19 @@ HAL_ISR_FUNCTION(gplink_tx_isr, UTX1_VECTOR)
 	HAL_EXIT_ISR();
 }
 
+extern void	wCube_SetRxEvent(void);
+#define set_rx_event	wCube_SetRxEvent
 
 HAL_ISR_FUNCTION(gplink_rx_isr, URX1_VECTOR)
 {
+	unsigned char	val;
+
 	HAL_ENTER_ISR();
 
+	val = U1DBUF;
+	kfifo_in(&rxqueue, &val, 1);
+
+	set_rx_event();
 
 	HAL_EXIT_ISR();
 }
@@ -365,5 +372,58 @@ void gplink_send_pkt(const void *src, unsigned char len)
 }
 
 
+/**
+ * @fn      gplink_genpkt
+ *
+ * @brief   gen packet
+ *
+ * @param   src - 
+ * @param   len - 
+ *
+ * @return  none
+ */
+unsigned char gplink_recv_pkt(void *buf, unsigned char *fsm)
+{
+	unsigned char	tmp;
+	unsigned char	*pkt = (unsigned char *) buf;
+
+	if (!kfifo_len(&rxqueue)) {
+		return 0;
+	}
+
+	switch (*fsm) {
+	// get leading code
+	case 0:
+		kfifo_out(&rxqueue, &tmp, 1);
+		if (tmp == 0xfa) {
+			pkt[0] = tmp;
+			*fsm   = 1;
+		}
+		break;
+
+	// get length
+	case 1:
+		kfifo_out(&rxqueue, &tmp, 1);
+		pkt[1] = tmp;
+		*fsm   = 2;
+		break;
+
+	// get packet content
+	case 2:
+		if (kfifo_len(&rxqueue) >= (pkt[1]-2)) {
+			kfifo_out(&rxqueue, &pkt[2], pkt[1]-2);
+			*fsm = 3;
+			return 2;
+		}
+		break;
+
+	// waiting for <ble->app>
+	default:
+
+		break;
+	}
+
+	return 1;
+}
 
 

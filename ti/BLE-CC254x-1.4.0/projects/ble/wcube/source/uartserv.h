@@ -65,7 +65,8 @@ typedef enum {
 	SNAPSHOT			= 0x02,
 	READ_STATUS			= 0x03,
 	INQUIRY_PIC			= 0x21,
-	GET_PIC				= 0x22,
+	INQUIRY_BLOCK			= 0x22,
+	GET_PIC				= 0x23,
 	STATUS_PACKET			= 0x80,
 	BLOCK_DATA_PACKET		= 0x20,
 } uartpkt_cmd_t;

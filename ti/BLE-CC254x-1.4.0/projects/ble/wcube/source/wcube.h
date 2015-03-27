@@ -64,21 +64,7 @@ extern "C"
 #define EVT_MODE				0x0004
 #define EVT_SLEEP				0x0008
 #define EVT_RTC					0x0010
-#define EVT_GSNINT1				0x0020
-#define EVT_GSNINT2				0x0040
-#define EVT_GSENSOR				0x0080
-#define EVT_DISP				0x0100
-#define EVT_CHARGING				0x0200
-
-#define MODE_NORMAL				0x00
-#define MODE_WORKOUT				0x10
-#define MODE_SLEEP				0x20
-
-#define MODE_TIME				0x00
-#define MODE_STEP				0x01
-#define MODE_CALORIE				0x02
-#define MODE_DISTANCE				0x03
-#define MODE_DBG				0x04
+#define EVT_GPLINKRX				0x0020
 
 
 

@@ -261,9 +261,10 @@ static uint8		attDeviceName[] = "ZT-3000";
 #endif
 
 // sensor state variables
-static bool		key1_press	= FALSE;
+static bool		key1_press = FALSE;
 
-
+static unsigned char	rxpkt[128];
+static unsigned char	rxpkt_fsm = 0;
 
 
 
@@ -521,7 +522,7 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
 
 
 /*
- * @fn		ptProfile_PktParsing
+ * @fn		uartServ1PktParsing
  *
  * @brief
  *
@@ -538,7 +539,7 @@ static char	*resul[] = { "full HD", "HD", "VGA", "QVGA", "CIF", "QCIF" };
 static char	*speed[] = { "1x", "2x", "3x", "4x" }; 
 static char	*power[] = { "50Hz", "60Hz" };
 
-static char uartServPktParsing(uartpkt_t *pkt)
+static char uartServ1PktParsing(uartpkt_t *pkt)
 {
 	char		i;
 	unsigned char	len    = pkt->header.len;
@@ -557,19 +558,42 @@ static char uartServPktParsing(uartpkt_t *pkt)
 	// packet parsing
 	switch (cmd) {
 	case SET_DATE:
-		dmsg(("<app->ble>: set date\n"));
-		dmsg(("current date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
+		dmsg(("<app->ble>: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
 		gplink_send_pkt(pkt, len);
 		return 1;
 
 	case RECORD_START:
-		dmsg(("<app->ble>: record start\n"));
-		dmsg(("resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
+		dmsg(("<app->ble>: record start - resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
 		gplink_send_pkt(pkt, len);
 		return 1;
 
 	case RECORD_STOP:
 		dmsg(("<app->ble>: record stop\n"));
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case SNAPSHOT:
+		dmsg(("<app->ble>: snapshot - resolution:%s power:%s\n", resul[pkt->buf[3]], power[pkt->buf[4]]));
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case READ_STATUS:
+		dmsg(("<app->ble>: read status\n"));
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case INQUIRY_PIC:
+		dmsg(("<app->ble>: inquiry pic\n"));
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case INQUIRY_BLOCK:
+		dmsg(("<app->ble>: inquiry block - pic:%02d\n", pkt->buf[3]));
+		gplink_send_pkt(pkt, len);
+		return 1;
+
+	case GET_PIC:
+		dmsg(("<app->ble>: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
 		gplink_send_pkt(pkt, len);
 		return 1;
 
@@ -595,7 +619,7 @@ static void uartServ1ChgCB(uint8 paramID)
 	switch (paramID) {
 	case UARTSERV1_CHAR:
 		uartServ1_GetParameter(UARTSERV1_CHAR, &uartpkt);
-		uartServPktParsing(&uartpkt);
+		uartServ1PktParsing(&uartpkt);
 
 		break;
 
@@ -835,15 +859,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 	///////////////////////////////////////////////////////////////////////
 
 
-	///////////////////////////////////////////////////////////////////////
-	// display handle                                                    //
-	///////////////////////////////////////////////////////////////////////
-	if (events & EVT_DISP) {
 
-
-
-		return (events ^ EVT_DISP);
-	}
 
 
 	///////////////////////////////////////////////////////////////////////
@@ -859,10 +875,35 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 
 	///////////////////////////////////////////////////////////////////////
+	// gplink RX handle                                                  //
+	///////////////////////////////////////////////////////////////////////
+	if (events & EVT_GPLINKRX) {
+		switch (gplink_recv_pkt(rxpkt, &rxpkt_fsm)) {
+		default:
+		case 0:
+			return (events ^ EVT_GPLINKRX);
+
+		case 1:
+			return (events);
+
+		case 2:
+			uartServ2_SetParameter(UARTSERV2_CHAR, rxpkt[1], rxpkt);
+			rxpkt_fsm = 0;
+			return (events ^ EVT_GPLINKRX);
+		}
+	}
+
+
+	///////////////////////////////////////////////////////////////////////
 	// discard unknown events                                            //
 	///////////////////////////////////////////////////////////////////////
 
 	return 0;
 }
 
+
+void wCube_SetRxEvent(void)
+{
+	osal_set_event(wCube_TaskID, EVT_GPLINKRX);
+}
 
