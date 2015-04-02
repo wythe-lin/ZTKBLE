@@ -264,8 +264,6 @@ static uint8		attDeviceName[] = "ZT-3000";
 static bool		key1_press = FALSE;
 
 static unsigned char	rxpkt[128];
-static unsigned char	rxpkt_fsm = 0;
-
 
 
 /*
@@ -966,19 +964,62 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 	// gplink RX handle                                                  //
 	///////////////////////////////////////////////////////////////////////
 	if (events & EVT_GPLINKRX) {
-		switch (gplink_recv_pkt(rxpkt, &rxpkt_fsm)) {
-		default:
-		case 0:
-			return (events ^ EVT_GPLINKRX);
+		static unsigned char	ofs, len, loop;
+		static unsigned long	msec;
 
-		case 1:
+		switch (gplink_handle) { 
+		case 0:	// reset & init
+			gplink_rst_parse();
+			gplink_handle = 1;
 			return (events);
 
+		case 1:	// get a packet to rxpkt
+			switch (gplink_recv_pkt(rxpkt)) {
+			case 0:	// length not enough
+				return (events ^ EVT_GPLINKRX);
+
+			case 1:	// parsing packet
+				return (events);
+
+			case 2:	// finish
+				uartServ2PktParsing((uartpkt_t *) &rxpkt);	// make pseudo packet
+				gplink_handle = 2;
+				return (events);
+			}
+
 		case 2:
-			uartServ2PktParsing((uartpkt_t *) &rxpkt);
-			uartServ2_SetParameter(UARTSERV2_CHAR, rxpkt[1], rxpkt);
-			rxpkt_fsm = 0;
+			ofs    = 0;
+			len    = rxpkt[1];
+			loop   = len / 20;
+			loop  += (len % 20) ? 1 : 0;
+			gplink_handle = 3;
+			return (events);
+
+		case 3:	//  send notification to app (ble->app)
+			if (len < 20) {
+				uartServ2_SetParameter(UARTSERV2_CHAR, len, &rxpkt[ofs]);
+			} else {
+				uartServ2_SetParameter(UARTSERV2_CHAR,  20, &rxpkt[ofs]);
+				len -= 20;
+				ofs += 20;
+			}
+			if (--loop) {
+				gplink_handle = 4;	// delay
+				return (events);
+			}
+			gplink_handle = 0;		// send finish
 			return (events ^ EVT_GPLINKRX);
+
+		case 4:	// get system clock
+			msec = osal_GetSystemClock();
+			gplink_handle = 5;
+			return (events);
+
+		case 5:	// delay 20ms*??
+			if ((osal_GetSystemClock() - msec) >= 20*4) {
+				gplink_handle = 3;
+			}
+			return (events);
 		}
 	}
 

@@ -75,6 +75,17 @@
  *
  ******************************************************************************
  */
+unsigned char		gplink_handle;
+static unsigned char	gplink_parse;
+
+
+/*
+ ******************************************************************************
+ *
+ * local variables
+ *
+ ******************************************************************************
+ */
 #define TXBUF_SIZE		128
 #define RXBUF_SIZE		128
 
@@ -89,16 +100,6 @@ static struct kfifo	txqueue;
 static struct kfifo	rxqueue;
 static unsigned char	txbuf[TXBUF_SIZE];
 static unsigned char	rxbuf[RXBUF_SIZE];
-
-
-/*
- ******************************************************************************
- *
- * local variables
- *
- ******************************************************************************
- */
-
 
 
 /*
@@ -292,6 +293,9 @@ void gplink_init(void)
 	kfifo_init(&txqueue, txbuf, TXBUF_SIZE);
 	kfifo_init(&rxqueue, rxbuf, RXBUF_SIZE);
 
+	gplink_handle = 0;
+	gplink_parse  = 0;
+
 	// init UART port
 	PERCFG     &= ~(1 << 1);
 	P0SEL      |=  (0x0F << 2);
@@ -347,7 +351,7 @@ HAL_ISR_FUNCTION(gplink_rx_isr, URX1_VECTOR)
 
 
 /**
- * @fn      gplink_genpkt
+ * @fn      gplink_send_pkt
  *
  * @brief   gen packet
  *
@@ -373,6 +377,57 @@ void gplink_send_pkt(const void *src, unsigned char len)
 
 
 /**
+ * @fn      gplink_recv_pkt
+ *
+ * @brief   gen packet
+ *
+ * @param   src - 
+ * @param   len - 
+ *
+ * @return  none
+ */
+unsigned char gplink_recv_pkt(void *buf)
+{
+	unsigned char	tmp;
+	unsigned char	*pkt = (unsigned char *) buf;
+
+	switch (gplink_parse) {
+	case 0:	// get leading code
+		if (kfifo_len(&rxqueue) == 0) {
+			return 0;	// length not enough
+		}
+		kfifo_out(&rxqueue, &tmp, 1);
+		if (tmp == 0xfa/*0x05*/) {
+			pkt[0] = tmp;
+			gplink_parse = 1;
+		}
+		break;
+
+	case 1:	// get length
+		if (kfifo_len(&rxqueue)) {
+			kfifo_out(&rxqueue, &tmp, 1);
+			pkt[1] = tmp;
+			gplink_parse = 2;
+		}
+		break;
+
+	case 2:	// get packet content
+		if (kfifo_len(&rxqueue) >= (pkt[1]-2)) {
+			kfifo_out(&rxqueue, &pkt[2], pkt[1]-2);
+			gplink_parse = 3;
+			return 2;	// finish
+		}
+		break;
+
+	// waiting for <ble->app>
+	default:
+		break;
+	}
+
+	return 1;	// continue
+}
+
+/**
  * @fn      gplink_genpkt
  *
  * @brief   gen packet
@@ -382,48 +437,8 @@ void gplink_send_pkt(const void *src, unsigned char len)
  *
  * @return  none
  */
-unsigned char gplink_recv_pkt(void *buf, unsigned char *fsm)
+void gplink_rst_parse(void)
 {
-	unsigned char	tmp;
-	unsigned char	*pkt = (unsigned char *) buf;
-
-	if (!kfifo_len(&rxqueue)) {
-		return 0;
-	}
-
-	switch (*fsm) {
-	// get leading code
-	case 0:
-		kfifo_out(&rxqueue, &tmp, 1);
-		if (tmp == 0xfa/*0x05*/) {
-			pkt[0] = tmp;
-			*fsm   = 1;
-		}
-		break;
-
-	// get length
-	case 1:
-		kfifo_out(&rxqueue, &tmp, 1);
-		pkt[1] = tmp;
-		*fsm   = 2;
-		break;
-
-	// get packet content
-	case 2:
-		if (kfifo_len(&rxqueue) >= (pkt[1]-2)) {
-			kfifo_out(&rxqueue, &pkt[2], pkt[1]-2);
-			*fsm = 3;
-			return 2;
-		}
-		break;
-
-	// waiting for <ble->app>
-	default:
-
-		break;
-	}
-
-	return 1;
+	gplink_parse = 0;
 }
-
 

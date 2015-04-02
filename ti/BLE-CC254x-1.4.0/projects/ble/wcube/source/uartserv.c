@@ -507,52 +507,27 @@ bStatus_t uartServ2_SetParameter(uint8 param, uint8 len, void *value)
 
 	switch (param) {
 	case UARTSERV2_CHAR:
-//		{
-//			uint8	i;
-//			uint8	*pValue = (uint8 *) value;
-//			uint8	displen = (len < 16) ? len : 16;
-//
-//			dmsg(("[ble->app]:"));
-//			for (i=0; i<displen; i++) {
-//				dmsg((" %02x", pValue[i]));
-//			}
-//			dmsg(("%s", (len < 16) ? "\n" : "...\n"));
-//		}
 		{
 			attHandleValueNoti_t	noti;
 			uint16			notiHandle;
-			uint8			maxlen, loop, ofs, i;
 			uint8			*pkt = (uint8 *) value;
 
 			GAPRole_GetParameter(GAPROLE_CONNHANDLE, &notiHandle);
 			noti.handle = uartServ2AttrTbl[2].handle;
 
-			maxlen = sizeof(noti.value);
-			loop   = len / maxlen;
-			loop  += (len % maxlen) ? 1 : 0;
-			ofs    = 0;
-			for (i=0; i<loop; i++) {
-				if (len < maxlen) {
-					noti.len = len;
-					osal_memcpy(&noti.value[0], &pkt[ofs], noti.len);
-				} else {
-					noti.len = maxlen;
-					osal_memcpy(&noti.value[0], &pkt[ofs], noti.len);
-					len -= noti.len;
-					ofs += noti.len;
-				}
-				GATT_Notification(notiHandle, &noti, FALSE);
+			noti.len = len;
+			osal_memcpy(&noti.value[0], pkt, noti.len);
+			GATT_Notification(notiHandle, &noti, FALSE);
 
-				//
-				{
-					uint8	i;
+			//
+			{
+				uint8	i;
 
-					dmsg(("[ble->app]:"));
-					for (i=0; i<noti.len; i++) {
-						dmsg((" %02x", noti.value[i]));
-					}
-					dmsg(("\n"));
+				dmsg(("[ble->app]:"));
+				for (i=0; i<noti.len; i++) {
+					dmsg((" %02x", noti.value[i]));
 				}
+				dmsg(("\n"));
 			}
 		}
 		break;

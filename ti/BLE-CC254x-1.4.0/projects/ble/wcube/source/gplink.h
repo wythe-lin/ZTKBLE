@@ -49,7 +49,7 @@ extern "C"
  * Variables
  ******************************************************************************
  */
-
+extern unsigned char	gplink_handle;
 
 
 /*
@@ -59,8 +59,8 @@ extern "C"
  */
 extern void		gplink_init(void);
 extern void		gplink_send_pkt(const void *src, unsigned char len);
-extern unsigned char	gplink_recv_pkt(void *buf, unsigned char *fsm);
-
+extern unsigned char	gplink_recv_pkt(void *buf);
+extern void		gplink_rst_parse(void);
 
 
 #ifdef __cplusplus
