@@ -471,7 +471,7 @@ bStatus_t uartServ1_GetParameter(uint8 param, void *value)
 			uint8	i;
 			uint8	*pValue = (uint8 *) value;
 
-			dmsg(("[OUT]:"));
+			dmsg(("[app->ble]:"));
 			for (i=0; i<pValue[1]; i++) {
 				dmsg((" %02x", pValue[i]));
 			}
@@ -507,17 +507,17 @@ bStatus_t uartServ2_SetParameter(uint8 param, uint8 len, void *value)
 
 	switch (param) {
 	case UARTSERV2_CHAR:
-		{
-			uint8	i;
-			uint8	*pValue = (uint8 *) value;
-			uint8	displen = (len < 16) ? len : 16;
-
-			dmsg(("[IN]:"));
-			for (i=0; i<displen; i++) {
-				dmsg((" %02x", pValue[i]));
-			}
-			dmsg(("%s", (len < 16) ? "\n" : "...\n"));
-		}
+//		{
+//			uint8	i;
+//			uint8	*pValue = (uint8 *) value;
+//			uint8	displen = (len < 16) ? len : 16;
+//
+//			dmsg(("[ble->app]:"));
+//			for (i=0; i<displen; i++) {
+//				dmsg((" %02x", pValue[i]));
+//			}
+//			dmsg(("%s", (len < 16) ? "\n" : "...\n"));
+//		}
 		{
 			attHandleValueNoti_t	noti;
 			uint16			notiHandle;
@@ -542,6 +542,17 @@ bStatus_t uartServ2_SetParameter(uint8 param, uint8 len, void *value)
 					ofs += noti.len;
 				}
 				GATT_Notification(notiHandle, &noti, FALSE);
+
+				//
+				{
+					uint8	i;
+
+					dmsg(("[ble->app]:"));
+					for (i=0; i<noti.len; i++) {
+						dmsg((" %02x", noti.value[i]));
+					}
+					dmsg(("\n"));
+				}
 			}
 		}
 		break;

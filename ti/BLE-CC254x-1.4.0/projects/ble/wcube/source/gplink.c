@@ -395,7 +395,7 @@ unsigned char gplink_recv_pkt(void *buf, unsigned char *fsm)
 	// get leading code
 	case 0:
 		kfifo_out(&rxqueue, &tmp, 1);
-		if (tmp == 0xfa) {
+		if (tmp == 0xfa/*0x05*/) {
 			pkt[0] = tmp;
 			*fsm   = 1;
 		}

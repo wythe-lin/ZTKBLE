@@ -558,49 +558,136 @@ static char uartServ1PktParsing(uartpkt_t *pkt)
 	// packet parsing
 	switch (cmd) {
 	case SET_DATE:
-		dmsg(("<app->ble>: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
+		dmsg(("command: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case RECORD_START:
-		dmsg(("<app->ble>: record start - resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
+		dmsg(("command: record start - resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case RECORD_STOP:
-		dmsg(("<app->ble>: record stop\n"));
+		dmsg(("command: record stop\n"));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case SNAPSHOT:
-		dmsg(("<app->ble>: snapshot - resolution:%s power:%s\n", resul[pkt->buf[3]], power[pkt->buf[4]]));
+		dmsg(("command: snapshot - resolution:%s power:%s\n", resul[pkt->buf[3]], power[pkt->buf[4]]));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case READ_STATUS:
-		dmsg(("<app->ble>: read status\n"));
+		dmsg(("command: read status\n"));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case INQUIRY_PIC:
-		dmsg(("<app->ble>: inquiry pic\n"));
+		dmsg(("command: inquiry pic\n"));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	case INQUIRY_BLOCK:
-		dmsg(("<app->ble>: inquiry block - pic:%02d\n", pkt->buf[3]));
+		dmsg(("command: inquiry block - pic:%02d\n", pkt->buf[3]));
 		gplink_send_pkt(pkt, len);
 		return 1;
 
 	case GET_PIC:
-		dmsg(("<app->ble>: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
+		dmsg(("command: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
 		gplink_send_pkt(pkt, len);
-		return 1;
+		break;
 
 	default:
 		dmsg(("Unknown command\n"));
 		return 0;
 	}
+	return 1;
+}
+
+
+static const unsigned char	pic[] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,		0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,		0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,		0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+
+	0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,		0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,		0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+	0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67,		0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+	0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,		0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+                                                                                                             
+	0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+	0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+};
+
+static char uartServ2PktParsing(uartpkt_t *pkt)
+{
+	char		i;
+	unsigned char	len    = pkt->header.len;
+	unsigned char	cmd    = pkt->header.command;
+	unsigned char	blk    = pkt->buf[4];
+	unsigned char	chksum = 0;
+
+	// check checksum
+	for (i=1; i<len-2; i++) {
+		chksum += pkt->buf[i];
+	}
+	if (chksum != pkt->buf[len-2]) {
+		return 0;
+	}
+
+	// packet parsing
+	switch (cmd) {
+	case SET_DATE:
+	case RECORD_START:
+	case RECORD_STOP:
+	case SNAPSHOT:
+	case READ_STATUS:
+	case INQUIRY_PIC:
+	case INQUIRY_BLOCK:
+		dmsg(("make status packet\n"));
+		len         = 0x09;
+		pkt->buf[0] = 0x05;					// leading
+		pkt->buf[1] = len;					// length
+		pkt->buf[2] = 0x80;					// command
+		pkt->buf[3] = 0x00;					// ack
+		pkt->buf[4] = 0x00;					// storage
+		pkt->buf[5] = (cmd == RECORD_START) ? 0x01 : 0x00;	// status
+		switch (cmd) {
+		case INQUIRY_PIC:	pkt->buf[6] = 0x01;	break;	// data
+		case INQUIRY_BLOCK:	pkt->buf[6] = 0x03;	break;	// data
+		default:		pkt->buf[6] = 0x00;	break;	// data
+		}
+		pkt->buf[7] = 0x00;					// checksum
+		pkt->buf[8] = 0xFE;					// ending
+		break;
+
+	case GET_PIC:
+		dmsg(("make data block packet\n"));
+		len		= (blk == 2) ? 32+5 : 64+5;		// length
+		pkt->buf[0]	= 0x05;					// leading
+		pkt->buf[1]	= len;					// length
+		pkt->buf[2]	= 0x20;					// command
+		pkt->buf[len-2] = 0x00;					// checksum
+		pkt->buf[len-1] = 0xFE;					// ending
+
+		switch (blk) {
+		case 0:	osal_memcpy(&pkt->buf[3], &pic[  0], len-5);	break;
+		case 1:	osal_memcpy(&pkt->buf[3], &pic[ 64], len-5);	break;
+		case 2:	osal_memcpy(&pkt->buf[3], &pic[128], len-5);	break;
+		}
+		break;
+
+	default:
+		dmsg(("Unknown command\n"));
+		return 0;
+	}
+
+	// calculate checksum
+	for (i=1, chksum=0; i<len-2; i++) {
+		chksum += pkt->buf[i];
+	}
+	pkt->buf[len-2] = chksum;
 	return 1;
 }
 
@@ -869,7 +956,8 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 		// performed once per second
 
 		dmsg(("."));
-		Batt_SetLevel(batt_get_level());
+//		Batt_SetLevel(batt_get_level());
+		Batt_SetLevel(40);
 		return (events ^ EVT_RTC);
 	}
 
@@ -887,6 +975,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 			return (events);
 
 		case 2:
+			uartServ2PktParsing((uartpkt_t *) &rxpkt);
 			uartServ2_SetParameter(UARTSERV2_CHAR, rxpkt[1], rxpkt);
 			rxpkt_fsm = 0;
 			return (events ^ EVT_GPLINKRX);
