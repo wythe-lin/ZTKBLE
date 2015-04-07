@@ -533,75 +533,13 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
  *
  * @return
  */
-static char	*resul[] = { "full HD", "HD", "VGA", "QVGA", "CIF", "QCIF" };
-static char	*speed[] = { "1x", "2x", "3x", "4x" }; 
-static char	*power[] = { "50Hz", "60Hz" };
-
-static char uartServ1PktParsing(uartpkt_t *pkt)
+static unsigned char chk_p0_2(void)
 {
-	char		i;
-	unsigned char	len    = pkt->header.len;
-	unsigned char	cmd    = pkt->header.command;
-	unsigned char	chksum = 0;
-
-	// check checksum
-	for (i=1; i<len-2; i++) {
-		chksum += pkt->buf[i];
-	}
-	if (chksum != pkt->buf[len-2]) {
-
-		return 0;
-	}
-
-	// packet parsing
-	switch (cmd) {
-	case SET_DATE:
-		dmsg(("command: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case RECORD_START:
-		dmsg(("command: record start - resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case RECORD_STOP:
-		dmsg(("command: record stop\n"));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case SNAPSHOT:
-		dmsg(("command: snapshot - resolution:%s power:%s\n", resul[pkt->buf[3]], power[pkt->buf[4]]));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case READ_STATUS:
-		dmsg(("command: read status\n"));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case INQUIRY_PIC:
-		dmsg(("command: inquiry pic\n"));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	case INQUIRY_BLOCK:
-		dmsg(("command: inquiry block - pic:%02d\n", pkt->buf[3]));
-		gplink_send_pkt(pkt, len);
-		return 1;
-
-	case GET_PIC:
-		dmsg(("command: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
-		gplink_send_pkt(pkt, len);
-		break;
-
-	default:
-		dmsg(("Unknown command\n"));
-		return 0;
-	}
-	return 1;
+	P2INP &= ~(1 << 5);	// p0 is pull-up
+	P0SEL &= ~(1 << 2);	// p0.2 is general-purpose I/O
+	P0DIR &= ~(1 << 2);	// p0.2 is input
+	return P0_2;
 }
-
 
 static const unsigned char	pic[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -643,9 +581,13 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 	case READ_STATUS:
 	case INQUIRY_PIC:
 	case INQUIRY_BLOCK:
-		dmsg(("make status packet\n"));
+		if (chk_p0_2()) {
+			dmsg(("send status packet\n"));
+		} else {
+			dmsg(("make status packet\n"));
+		}
 		len         = 0x09;
-		pkt->buf[0] = 0x05;					// leading
+		pkt->buf[0] = 0xFA;					// leading
 		pkt->buf[1] = len;					// length
 		pkt->buf[2] = 0x80;					// command
 		pkt->buf[3] = 0x00;					// ack
@@ -661,9 +603,13 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 		break;
 
 	case GET_PIC:
-		dmsg(("make data block packet\n"));
+		if (chk_p0_2()) {
+			dmsg(("send data block packet\n"));
+		} else {
+			dmsg(("make data block packet\n"));
+		}
 		len		= (blk == 2) ? 32+5 : 64+5;		// length
-		pkt->buf[0]	= 0x05;					// leading
+		pkt->buf[0]	= 0xFA;					// leading
 		pkt->buf[1]	= len;					// length
 		pkt->buf[2]	= 0x20;					// command
 		pkt->buf[len-2] = 0x00;					// checksum
@@ -677,7 +623,7 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 		break;
 
 	default:
-		dmsg(("Unknown command\n"));
+		dmsg(("Unknown command (Serv2)\n"));
 		return 0;
 	}
 
@@ -686,6 +632,105 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 		chksum += pkt->buf[i];
 	}
 	pkt->buf[len-2] = chksum;
+	return 1;
+}
+
+
+
+static void gplink_send_ackpkt(uartpkt_t *pkt)
+{
+	if (chk_p0_2()) {
+		uartServ2PktParsing(pkt);
+	}
+}
+
+
+/*
+ * @fn		uartServ1PktParsing
+ *
+ * @brief
+ *
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ * @param
+ *
+ * @return
+ */
+static char	*resul[] = { "full HD", "HD", "VGA", "QVGA", "CIF", "QCIF" };
+static char	*speed[] = { "1x", "2x", "3x", "4x" }; 
+static char	*power[] = { "50Hz", "60Hz" };
+
+static char uartServ1PktParsing(uartpkt_t *pkt)
+{
+	char		i;
+	unsigned char	chksum = 0;
+
+	// check checksum
+	for (i=1; i<pkt->header.len-2; i++) {
+		chksum += pkt->buf[i];
+	}
+	if (chksum != pkt->buf[pkt->header.len-2]) {
+
+		return 0;
+	}
+
+	// packet parsing
+	switch (pkt->header.command) {
+	case SET_DATE:
+		dmsg(("command: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case RECORD_START:
+		dmsg(("command: record start - resolution:%s speed:%s power:%s\n", resul[pkt->buf[3]], speed[pkt->buf[4]], power[pkt->buf[5]]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case RECORD_STOP:
+		dmsg(("command: record stop\n"));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case SNAPSHOT:
+		dmsg(("command: snapshot - resolution:%s power:%s\n", resul[pkt->buf[3]], power[pkt->buf[4]]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case READ_STATUS:
+		dmsg(("command: read status\n"));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case INQUIRY_PIC:
+		dmsg(("command: inquiry pic\n"));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case INQUIRY_BLOCK:
+		dmsg(("command: inquiry block - pic:%02d\n", pkt->buf[3]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		return 1;
+
+	case GET_PIC:
+		dmsg(("command: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	default:
+		dmsg(("Unknown command (Serv1)\n"));
+		return 0;
+	}
 	return 1;
 }
 
@@ -934,7 +979,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 		osal_start_reload_timer(wCube_TaskID, EVT_RTC, PERIOD_RTC);
 
-		fmsg(("\033[40;33m\n[version]: 1.0 (100)\033[0m"));
+		fmsg(("\033[40;33m\n[version]: 1.0 (101s)\033[0m"));
 		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
 		return (events ^ EVT_START_DEVICE);
 	}
@@ -983,7 +1028,9 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 				return (events);
 
 			case 2:	// finish
-				uartServ2PktParsing((uartpkt_t *) &rxpkt);	// make pseudo packet
+				if (!chk_p0_2()) {
+					uartServ2PktParsing((uartpkt_t *) &rxpkt);	// make pseudo packet
+				}
 				gplink_handle = 2;
 				return (events);
 			}
