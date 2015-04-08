@@ -979,7 +979,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 		osal_start_reload_timer(wCube_TaskID, EVT_RTC, PERIOD_RTC);
 
-		fmsg(("\033[40;33m\n[version]: 1.0 (101s)\033[0m"));
+		fmsg(("\033[40;33m\n[version]: 1.0 (102s)\033[0m"));
 		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
 		return (events ^ EVT_START_DEVICE);
 	}
