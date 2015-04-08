@@ -9,7 +9,7 @@ TriggerName=main
 LimitSize=0
 ByteLimit=50
 [DebugChecksum]
-Checksum=1320905603
+Checksum=197039345
 [CallStack]
 ShowArgs=0
 [Disassembly]
@@ -52,11 +52,8 @@ ActionState=1
 [Trace1]
 Enabled=0
 ShowSource=1
-[Breakpoints]
-Count=0
-[ChipconEmu]
-Stop timers on halt=0
-Leave target running=1
+[watch_formats]
+Fmt0={W}0:U1UCR	4	0
 [Log file]
 LoggingEnabled=_ 0
 LogFile=_ ""
@@ -64,6 +61,11 @@ Category=_ 0
 [TermIOLog]
 LoggingEnabled=_ 0
 LogFile=_ ""
+[Breakpoints]
+Count=0
+[ChipconEmu]
+Stop timers on halt=0
+Leave target running=1
 [Aliases]
 Count=0
 SuppressDialog=0

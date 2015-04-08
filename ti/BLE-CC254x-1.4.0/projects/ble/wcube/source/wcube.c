@@ -975,7 +975,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 		GAPBondMgr_Register(&wCube_BondMgrCBs);
 #endif
 		// start peripheral device
-
+		osal_pwrmgr_device(PWRMGR_ALWAYS_ON);
 
 		osal_start_reload_timer(wCube_TaskID, EVT_RTC, PERIOD_RTC);
 

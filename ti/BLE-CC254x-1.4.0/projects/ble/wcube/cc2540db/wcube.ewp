@@ -280,7 +280,6 @@
           <state>INT_HEAP_LEN=2048</state>
           <state>HALNODEBUG</state>
           <state>OSAL_CBTIMER_NUM_TASKS=1</state>
-          <state>POWER_SAVING</state>
           <state>GAPBONDMGR_NO_SUPPORT</state>
           <state>GAPROLE_ADVCHAN=39</state>
           <state>HAL_AES_DMA=TRUE</state>
