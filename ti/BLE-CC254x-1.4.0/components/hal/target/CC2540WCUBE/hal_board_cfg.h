@@ -108,8 +108,8 @@ extern "C"
 #define HAL_LED_BLINK_DELAY()	st( { volatile uint32 i; for (i=0; i<0x5800; i++) { }; } )
 
 /* 1 - Green */
-#define LED1_BV			BV(0)
-#define LED1_SBIT		P1_0
+#define LED1_BV			BV(2)
+#define LED1_SBIT		P1_2
 #define LED1_DDR		P1DIR
 #define LED1_SEL		P1SEL
 #define LED1_POLARITY		ACTIVE_HIGH
@@ -282,6 +282,10 @@ extern "C"
 	/* Enable cache prefetch mode. */					\
 	PREFETCH_ENABLE();							\
 										\
+	/* P1.0 output high */							\
+	P1_0   = 1;								\
+	P1SEL &= ~(1 << 0);	/* p1.0 is general-purpose I/O */		\
+	P1DIR |=  (1 << 0);	/* p1.0 is output */				\
 }
 
 /* Debounce */

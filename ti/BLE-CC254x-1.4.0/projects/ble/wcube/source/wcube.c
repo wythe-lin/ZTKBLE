@@ -979,7 +979,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 		osal_start_reload_timer(wCube_TaskID, EVT_RTC, PERIOD_RTC);
 
-		fmsg(("\033[40;33m\n[version]: 1.0 (102s)\033[0m"));
+		fmsg(("\033[40;33m\n[version]: 1.0 (103s)\033[0m"));
 		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
 		return (events ^ EVT_START_DEVICE);
 	}
@@ -1000,8 +1000,8 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 		// performed once per second
 
 		dmsg(("."));
-//		Batt_SetLevel(batt_get_level());
-		Batt_SetLevel(40);
+		Batt_SetLevel(batt_get_level());
+//		Batt_SetLevel(40);
 		return (events ^ EVT_RTC);
 	}
 

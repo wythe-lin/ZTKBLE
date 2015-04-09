@@ -400,7 +400,7 @@ unsigned char gplink_recv_pkt(void *buf)
 			return 0;	// length not enough
 		}
 		kfifo_out(&rxqueue, &tmp, 1);
-		if (tmp == 0xfa/*0x05*/) {
+		if (tmp == 0xfa) {
 			pkt[0] = tmp;
 			gplink_parse = 1;
 		}
@@ -409,8 +409,12 @@ unsigned char gplink_recv_pkt(void *buf)
 	case 1:	// get length
 		if (kfifo_len(&rxqueue)) {
 			kfifo_out(&rxqueue, &tmp, 1);
-			pkt[1] = tmp;
-			gplink_parse = 2;
+			if (tmp < RXBUF_SIZE*2/3) {
+				pkt[1] = tmp;
+				gplink_parse = 2;
+			} else {
+				gplink_parse = 0;	// length fail, re-get leading code
+			}
 		}
 		break;
 
