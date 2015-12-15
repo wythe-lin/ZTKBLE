@@ -83,6 +83,7 @@
 #include "defines.h"
 
 #include "uart.h"
+#include "plantimer.h"
 
 
 /*
@@ -408,7 +409,6 @@ static unsigned char batt_get_level(void)
 static void wCube_HandleKeys(uint8 shift, uint8 keys)
 {
 	VOID	shift;		// Intentionally unreferenced parameter
-	uint8	current_adv_status;
 
 	if (keys & HAL_KEY_SW_1) {
 		// press KEY1
@@ -520,14 +520,17 @@ static void pperipheral_StateNotification(gaprole_States_t newState)
 
 
 /*
- * @fn		uartServ1PktParsing
+ ******************************************************************************
+ *
+ * about ser access functions
+ *
+ ******************************************************************************
+ */
+/*
+ * @fn		uartServ1_PktParsing
  *
  * @brief
  *
- * @param
- * @param
- * @param
- * @param
  * @param
  * @param
  *
@@ -556,7 +559,7 @@ static const unsigned char	pic[] = {
 	0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,		0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
 };
 
-static char uartServ2PktParsing(uartpkt_t *pkt)
+static char uartServ2_PktParsing(uartpkt_t *pkt)
 {
 	char		i;
 	unsigned char	len    = pkt->header.len;
@@ -578,28 +581,34 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 	case RECORD_START:
 	case RECORD_STOP:
 	case SNAPSHOT:
+	case POWER_MANAGE:
 	case READ_STATUS:
 	case INQUIRY_PIC:
 	case INQUIRY_BLOCK:
+	case WRITE_GPIO:
+	case READ_GPIO:
+	case WRITE_PLAN:
 		if (chk_p0_2()) {
 			dmsg(("send status packet\n"));
 		} else {
 			dmsg(("make status packet\n"));
 		}
-		len         = 0x09;
+		len         = 10;
 		pkt->buf[0] = 0xFA;					// leading
 		pkt->buf[1] = len;					// length
 		pkt->buf[2] = 0x80;					// command
-		pkt->buf[3] = 0x00;					// ack
-		pkt->buf[4] = 0x00;					// storage
+		pkt->buf[3] = 0;					// ack
+		pkt->buf[4] = 0;					// storage
 		pkt->buf[5] = (cmd == RECORD_START) ? 0x01 : 0x00;	// status
+		pkt->buf[6] = 0;
 		switch (cmd) {
-		case INQUIRY_PIC:	pkt->buf[6] = 0x01;	break;	// data
-		case INQUIRY_BLOCK:	pkt->buf[6] = 0x03;	break;	// data
-		default:		pkt->buf[6] = 0x00;	break;	// data
+		case INQUIRY_PIC:	pkt->buf[7] = 0x01;	break;	// data
+		case INQUIRY_BLOCK:	pkt->buf[7] = 0x03;	break;	// data
+		case READ_GPIO:		pkt->buf[7] = 0x01;	break;	// data
+		default:		pkt->buf[7] = 0x00;	break;	// data
 		}
-		pkt->buf[7] = 0x00;					// checksum
-		pkt->buf[8] = 0xFE;					// ending
+		pkt->buf[8] = 0x00;					// checksum
+		pkt->buf[9] = 0xFE;					// ending
 		break;
 
 	case GET_PIC:
@@ -636,34 +645,29 @@ static char uartServ2PktParsing(uartpkt_t *pkt)
 }
 
 
-
-static void gplink_send_ackpkt(uartpkt_t *pkt)
-{
-	if (chk_p0_2()) {
-		uartServ2PktParsing(pkt);
-	}
-}
-
-
 /*
- * @fn		uartServ1PktParsing
+ * @fn		uartServ1_PktParsing
  *
  * @brief
  *
  * @param
  * @param
  * @param
- * @param
- * @param
- * @param
  *
  * @return
  */
+static void gplink_send_ackpkt(uartpkt_t *pkt)
+{
+	if (chk_p0_2()) {
+		uartServ2_PktParsing(pkt);
+	}
+}
+
 static char	*resul[] = { "full HD", "HD", "VGA", "QVGA", "CIF", "QCIF" };
 static char	*speed[] = { "1x", "2x", "3x", "4x" }; 
 static char	*power[] = { "50Hz", "60Hz" };
 
-static char uartServ1PktParsing(uartpkt_t *pkt)
+static char uartServ1_PktParsing(uartpkt_t *pkt)
 {
 	char		i;
 	unsigned char	chksum = 0;
@@ -683,6 +687,17 @@ static char uartServ1PktParsing(uartpkt_t *pkt)
 		dmsg(("command: set date - date:%04d/%02d/%02d time:%02d:%02d:%02d\n", pkt->buf[3]+2000, pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8]));
 		gplink_send_ackpkt(pkt);
 		gplink_send_pkt(pkt, pkt->header.len);
+		{
+			UTCTimeStruct	tm;
+
+			tm.seconds = pkt->buf[8];	// 0-59
+			tm.minutes = pkt->buf[7];	// 0-59
+			tm.hour	   = pkt->buf[6];	// 0-23
+			tm.day	   = pkt->buf[5];	// 0-30
+			tm.month   = pkt->buf[4];	// 0-11
+			tm.year	   = pkt->buf[3]+2000;	// 2000+
+			osal_setClock(osal_ConvertUTCSecs(&tm));
+		}
 		break;
 
 	case RECORD_START:
@@ -709,6 +724,12 @@ static char uartServ1PktParsing(uartpkt_t *pkt)
 		gplink_send_pkt(pkt, pkt->header.len);
 		break;
 
+	case POWER_MANAGE:
+		dmsg(("command: power manage - optin:%02d\n", pkt->buf[3]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
 	case INQUIRY_PIC:
 		dmsg(("command: inquiry pic\n"));
 		gplink_send_ackpkt(pkt);
@@ -725,6 +746,50 @@ static char uartServ1PktParsing(uartpkt_t *pkt)
 		dmsg(("command: get pic - pic:%02d block:%02d\n", pkt->buf[3], pkt->buf[4]));
 		gplink_send_ackpkt(pkt);
 		gplink_send_pkt(pkt, pkt->header.len);
+		break;
+
+	case WRITE_GPIO:
+		dmsg(("command: write gpio - GPIO:%02d data:%02d\n", pkt->buf[3], pkt->buf[4]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+
+		if (pkt->buf[3] >= 128) {
+
+		}
+		break;
+
+	case READ_GPIO:
+		dmsg(("command: read gpio - GPIO:%02d\n", pkt->buf[4]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+
+		if (pkt->buf[3] >= 128) {
+
+		}
+		break;
+
+	case WRITE_PLAN:
+		dmsg(("command: write plan - id:%02d en:%02d type:%02d sHH:%02d sMM:%02d eHH:%02d eMM:%02d repeat:%02d\n",
+			pkt->buf[3], pkt->buf[4], pkt->buf[5], pkt->buf[6], pkt->buf[7], pkt->buf[8], pkt->buf[9], pkt->buf[10]));
+		gplink_send_ackpkt(pkt);
+		gplink_send_pkt(pkt, pkt->header.len);
+		{
+			UTCTimeStruct	t;
+			UTCTime		begin, end;
+
+			t.seconds = 0;			// 0-59
+			t.minutes = pkt->buf[7];	// 0-59
+			t.hour    = pkt->buf[6];	// 0-23
+			t.day     = 0;			// 0-30
+			t.month   = 0;			// 0-11
+			t.year    = 2000;		// 2000+
+			begin	  = osal_ConvertUTCSecs(&t);
+
+			t.minutes = pkt->buf[9];	// 0-59
+			t.hour    = pkt->buf[8];	// 0-23
+			end	  = osal_ConvertUTCSecs(&t);
+			plantmr_update(pkt->buf[3], pkt->buf[4], pkt->buf[5], begin, end, pkt->buf[10]);
+		}
 		break;
 
 	default:
@@ -749,7 +814,7 @@ static void uartServ1ChgCB(uint8 paramID)
 	switch (paramID) {
 	case UARTSERV1_CHAR:
 		uartServ1_GetParameter(UARTSERV1_CHAR, &uartpkt);
-		uartServ1PktParsing(&uartpkt);
+		uartServ1_PktParsing(&uartpkt);
 
 		break;
 
@@ -893,7 +958,7 @@ void wCube_Init(uint8 task_id)
 	gplink_init();
 
 	// Initialise sensor drivers
-
+	plantmr_reset();
 
 	// Register callbacks with profile
 	uartServ1_RegisterAppCBs(uartServ1CBs);
@@ -979,7 +1044,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 		osal_start_reload_timer(wCube_TaskID, EVT_RTC, PERIOD_RTC);
 
-		fmsg(("\033[40;33m\n[version]: 1.0 (103s)\033[0m"));
+		fmsg(("\033[40;33m\n[version]: 1.0 (104s)\033[0m"));
 		fmsg(("\033[40;32m\n[power on]\033[0m\n"));
 		return (events ^ EVT_START_DEVICE);
 	}
@@ -1001,7 +1066,21 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 		dmsg(("."));
 		Batt_SetLevel(batt_get_level());
-//		Batt_SetLevel(40);
+
+		{
+			UTCTimeStruct	t;
+			UTCTime		curr;
+
+			osal_ConvertUTCTime(&t, osal_getClock());
+			t.seconds = 0;		// 0-59
+//			t.minutes = 0;		// 0-59
+//			t.hour    = 0;		// 0-23
+			t.day     = 0;		// 0-30
+			t.month   = 0;		// 0-11
+			t.year    = 2000;	// 2000+
+			curr	  = osal_ConvertUTCSecs(&t);
+			plantmr_check(curr);
+		}
 		return (events ^ EVT_RTC);
 	}
 
@@ -1029,7 +1108,7 @@ uint16 wCube_ProcessEvent(uint8 task_id, uint16 events)
 
 			case 2:	// finish
 				if (!chk_p0_2()) {
-					uartServ2PktParsing((uartpkt_t *) &rxpkt);	// make pseudo packet
+					uartServ2_PktParsing((uartpkt_t *) &rxpkt);	// make pseudo packet
 				}
 				gplink_handle = 2;
 				return (events);

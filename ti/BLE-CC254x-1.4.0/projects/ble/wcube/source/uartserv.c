@@ -237,8 +237,6 @@ static gattAttribute_t		uartServ2AttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] = {
  *
  * @return  Success or Failure
  */
-static unsigned char	rxlen = 0;
-static unsigned char	rxofs = 0;
 static bStatus_t uartServ1_WriteAttrCB(uint16 connHandle, gattAttribute_t *pAttr, uint8 *pValue, uint8 len, uint16 offset)
 {
 	bStatus_t	status = SUCCESS;

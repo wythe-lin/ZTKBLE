@@ -64,9 +64,13 @@ typedef enum {
 	RECORD_STOP			= 0x11,
 	SNAPSHOT			= 0x02,
 	READ_STATUS			= 0x03,
+	POWER_MANAGE			= 0x00,
 	INQUIRY_PIC			= 0x21,
 	INQUIRY_BLOCK			= 0x22,
 	GET_PIC				= 0x23,
+	WRITE_GPIO			= 0x13,
+	READ_GPIO			= 0x15,
+	WRITE_PLAN			= 0x30,
 	STATUS_PACKET			= 0x80,
 	BLOCK_DATA_PACKET		= 0x20,
 } uartpkt_cmd_t;

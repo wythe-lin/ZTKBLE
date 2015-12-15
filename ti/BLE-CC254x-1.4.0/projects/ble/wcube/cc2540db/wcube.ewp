@@ -3279,6 +3279,9 @@
       <name>$PROJ_DIR$\..\source\osal_wcube.c</name>
     </file>
     <file>
+      <name>$PROJ_DIR$\..\source\plantimer.c</name>
+    </file>
+    <file>
       <name>$PROJ_DIR$\..\source\putchar.c</name>
     </file>
     <file>
